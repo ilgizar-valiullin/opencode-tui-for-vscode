@@ -70,7 +70,7 @@ Then press `F5` in VS Code to launch the Extension Development Host.
 
 ## Usage
 
-- Open the **OpenCode** panel from the activity bar (secondary sidebar)
+- Open the **OpenCode** panel from the activity bar (right sidebar)
 - `Ctrl+Shift+P` → **OpenCode: Open Terminal**
 - Right-click a file in the explorer → **Attach to OpenCode**
 - Select text in an editor → right-click → **Attach to OpenCode**
@@ -126,7 +126,7 @@ npx vsce package    # Build + package VSIX
 
 See [Development Guide](docs/development.md) for more details.
 
-## Localization
+## Localization (By AI)
 
 The extension supports 10 languages. To add a new translation, see [Localization Guide](docs/localization.md).
 
@@ -142,6 +142,32 @@ Available languages:
 - Russian (ru)
 - Portuguese (Brazilian) (pt-br)
 - Italian (it)
+
+## Donations / Support the Project
+
+* **EVM Address** (USDT, USDC, ETH, BNB): `0x3acf78e721aa065bd1509735a3ace630fcd0f452`
+
+  _Supported networks: BNB Smart Chain (BEP20), Polygon, Arbitrum One, Ethereum (ERC20)_
+  <details>
+  <summary>Show EVM QR Code</summary>
+  <img src=".github/images/evm.jpg" width="300" alt="EVM Deposit QR">
+  </details>
+
+* **USDT (TRC20)**: `TMG1BZJswd8UacHANKVi9Veq5FqSbaMjAQ`
+
+  _Supported network: Tron (TRC20)_
+  <details>
+  <summary>Show TRC20 QR Code</summary>
+  <img src=".github/images/trc20.jpg" width="300" alt="TRC20 Deposit QR">
+  </details>
+
+* **TON / USDT (TON)**: `UQDjf84AZSwuCPC3UWFv28p-V44zI-1lfhqCMfaex2Q-jDsY`
+
+  _Supported network: The Open Network (TON)_
+  <details>
+  <summary>Show TON QR Code</summary>
+  <img src=".github/images/ton.jpg" width="300" alt="TON Deposit QR">
+  </details>
 
 ## License
 
