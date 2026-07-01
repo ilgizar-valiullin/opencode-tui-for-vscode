@@ -1,6 +1,6 @@
 {
-  "displayName": "Integrazione OpenCode TUI",
-  "description": "OpenCode TUI integrato in VS Code con corretta gestione della tastiera per layout non latini",
+  "displayName": "OpenCode TUI per VS Code",
+  "description": "OpenCode TUI per VS Code — terminal AI integrato con corretta gestione della tastiera per layout non latini (cirillico, coreano, giapponese)",
   "viewContainer.title": "OpenCode",
   "view.terminal.name": "Terminale",
   "cmd.focusView.title": "OpenCode",
@@ -8,7 +8,7 @@
   "cmd.openTab.title": "OpenCode: Apri terminale (scheda)",
   "cmd.stopServer.title": "OpenCode: Ferma server",
   "cmd.attachFile.title": "Allega a OpenCode",
-  "config.title": "Integrazione OpenCode TUI",
+  "config.title": "OpenCode TUI per VS Code",
   "cfg.opencodePath.desc": "Percorso per opencode. Es.: 'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe', 'opencode.cmd' o semplicemente 'opencode'.",
   "cfg.serverPort.desc": "Porta per il server opencode. 0 = porta disponibile casuale.",
   "cfg.leaderChords.desc": "Caratteri leader chord da intercettare (es. [\"n\",\"m\",\"l\"]). Vuoto = usa tui.json o valori predefiniti integrati."

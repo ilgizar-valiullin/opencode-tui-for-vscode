@@ -33,13 +33,15 @@ export class OpenCodeServerManager {
   }
 
   writeToStdin(data: string): void {
-    this.helper_?.stdin?.writable &&
+    if (this.helper_?.stdin?.writable) {
       this.helper_.stdin.write(JSON.stringify({ type: "stdin", data }) + "\n");
+    }
   }
 
   resizePty(cols: number, rows: number): void {
-    this.helper_?.stdin?.writable &&
+    if (this.helper_?.stdin?.writable) {
       this.helper_.stdin.write(JSON.stringify({ type: "resize", cols, rows }) + "\n");
+    }
   }
 
   async start(openCodePath: string, preferredPort?: number, cwd?: string): Promise<void> {

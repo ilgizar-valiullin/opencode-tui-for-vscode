@@ -1,6 +1,6 @@
 {
-  "displayName": "OpenCode TUI 統合",
-  "description": "OpenCode TUI を VS Code に埋め込み、非ラテンキーボードレイアウトでも正しいキーボード処理を実現",
+  "displayName": "VS Code 向け OpenCode TUI",
+  "description": "VS Code 向け OpenCode TUI — 非ラテンキーボードレイアウト（キリル文字、韓国語、日本語）でも正しいキーボード処理を実現する組み込み AI ターミナル",
   "viewContainer.title": "OpenCode",
   "view.terminal.name": "ターミナル",
   "cmd.focusView.title": "OpenCode",
@@ -8,7 +8,7 @@
   "cmd.openTab.title": "OpenCode: ターミナルを開く（タブ）",
   "cmd.stopServer.title": "OpenCode: サーバーを停止",
   "cmd.attachFile.title": "OpenCode に添付",
-  "config.title": "OpenCode TUI 統合",
+  "config.title": "VS Code 向け OpenCode TUI",
   "cfg.opencodePath.desc": "opencode へのパス。例：'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe'、'opencode.cmd'、または 'opencode'。",
   "cfg.serverPort.desc": "opencode サーバーのポート。0 = ランダムな空きポート。",
   "cfg.leaderChords.desc": "インターセプトするリーダーコード文字（例：[\"n\",\"m\",\"l\"]）。空の場合は tui.json またはビルトインのデフォルトを使用。"

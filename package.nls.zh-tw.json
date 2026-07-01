@@ -1,6 +1,6 @@
 {
-  "displayName": "OpenCode TUI 整合",
-  "description": "在 VS Code 中嵌入 OpenCode TUI，為非拉丁鍵盤佈局提供正確的鍵盤處理",
+  "displayName": "適用於 VS Code 的 OpenCode TUI",
+  "description": "適用於 VS Code 的 OpenCode TUI — 嵌入式 AI 終端，為非拉丁鍵盤佈局（俄語、韓語、日語）提供正確的鍵盤處理",
   "viewContainer.title": "OpenCode",
   "view.terminal.name": "終端機",
   "cmd.focusView.title": "OpenCode",
@@ -8,7 +8,7 @@
   "cmd.openTab.title": "OpenCode: 開啟終端機（分頁）",
   "cmd.stopServer.title": "OpenCode: 停止伺服器",
   "cmd.attachFile.title": "附加到 OpenCode",
-  "config.title": "OpenCode TUI 整合",
+  "config.title": "適用於 VS Code 的 OpenCode TUI",
   "cfg.opencodePath.desc": "opencode 的路徑。例如：'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe'、'opencode.cmd' 或直接 'opencode'。",
   "cfg.serverPort.desc": "opencode 伺服器的連接埠。0 = 隨機可用連接埠。",
   "cfg.leaderChords.desc": "要攔截的前導和弦字元（例如 [\"n\",\"m\",\"l\"]）。為空則使用 tui.json 或內建預設值。"

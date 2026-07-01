@@ -1,13 +1,13 @@
 {
-  "name": "opencode-tui-unofficial",
+  "name": "opencode-tui-for-vscode",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "publisher": "opencode-tui-unofficial",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ilgizar-valiullin/opencode-tui-integration-unofficial.git"
+    "url": "https://github.com/ilgizar-valiullin/opencode-tui-for-vscode.git"
   },
   "engines": {
     "vscode": "^1.84.0"
@@ -123,15 +123,21 @@
   "scripts": {
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
+    "test": "node test/smoke.mjs",
+    "lint": "eslint src/ test/ esbuild.mjs eslint.config.mjs",
     "package": "node esbuild.mjs && vsce package"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
     "@types/vscode": "^1.84.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/parser": "^8.62.1",
     "@vscode/vsce": "^3.0.0",
     "@xterm/xterm": "^5.5.0",
     "esbuild": "^0.24.0",
-    "typescript": "^5.5.0"
+    "eslint": "^10.6.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.62.1"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

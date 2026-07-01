@@ -1,4 +1,4 @@
-import { get as httpGet, request as httpRequest } from "http";
+import { request as httpRequest } from "http";
 import { ServerStatus, SessionInfo, TuiCommandId } from "./types";
 
 export class OpenCodeClient {

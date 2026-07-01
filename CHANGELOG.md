@@ -1,22 +1,52 @@
 # Changelog
 
-## 1.0.0 — Initial Release
+## [1.1.1] — 2026-07-02
 
-### Features
-- OpenCode TUI embedded in VS Code webview panel via xterm.js 5.5.0
-- PTY-based terminal emulation through node-pty for proper I/O
-- Binary null-delimited stdout protocol for efficient data transfer
-- Server lifecycle tied to webview panel visibility
-- Working directory set to VS Code workspace folder
-- Resize forwarding from webview to PTY
+### Added
 
-### Ghosting Fix
-- Cleaned terminal environment variables (WT_SESSION, TERM_PROGRAM, etc.) passed to PTY to prevent opencode from using synchronized output markers (\x1b[?2026h/l) incompatible with node-pty/ConPTY
-- Added PTY options: `useConptyDll: true`, `conptyInheritCursor: false`, `handleFlowControl: false`
+- i18n: package.nls.json + 10 locale files (zh-cn, zh-tw, ja, ko, de, fr, es, ru, pt-br, it)
+- i18n: l10n/bundle.l10n.json + 10 locale files for code strings
+- vscode.l10n.t() for error messages
+- System Node.js detection on Linux/macOS (via PATH lookup)
+- VS Code error notification when Node.js is not found
+- CI: GitHub Actions workflow (typecheck, lint, test, build, package VSIX)
+- ESLint config with TypeScript rules
+- test/smoke.mjs — 13 smoke tests (build output, package.json, icons, locale, tsc)
+- docs/architecture.md — architecture documentation
+- docs/keyboard-handling.md — keyboard handling design
+- docs/localization.md — localization guide
+- docs/decisions.md — architecture decision records (10 ADRs)
 
-### Testing
-- `test/liveview.mjs` — standalone PTY bridge for testing opencode output in native PowerShell without VS Code
+### Changed
 
-### Known Limitations
-- Emacs-style leader key sequences (Ctrl+X + follow-up) pending
-- Non-Latin keyboard layout input pending
+- Extension name: `opencode-tui-unofficial` → `opencode-tui-for-vscode`
+- Display name: `OpenCode TUI Integration` → `OpenCode TUI for VS Code`
+- Repository renamed to `opencode-tui-for-vscode`
+- Command title: `OpenCode: Attach File` → `Attach to OpenCode`
+- findNode() now searches PATH on Linux/macOS instead of falling back to Electron
+- writeToStdin/resizePty use if-guard instead of && short-circuit
+
+### Fixed
+
+- No Electron ABI fallback for node-pty — clean error if system Node.js not found
+- Unused import in httpClient.ts removed
+
+## [1.1.0] — 2026-06
+
+### Changed
+
+- Updated package.nls.json references for localization
+
+## [1.0.0] — 2025-06
+
+### Added
+
+- Initial release
+- OpenCode TUI in VS Code webview panel
+- event.code-based keyboard interception (Cyrillic/Korean/Japanese support)
+- Leader key (Ctrl+X) + chord mapping via HTTP API
+- node-pty based terminal emulation via separate helper process
+- Attach file/selection commands
+- MCP server for IDE context awareness
+- Sidebar view + tab support
+- Auto-detect opencode.exe on Windows
