@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            asset_suffix: linux-x64
+          - os: windows-latest
+            target: win32-x64
+            asset_suffix: win32-x64
+          - os: macos-13
+            target: darwin-x64
+            asset_suffix: darwin-x64
+          - os: macos-latest
+            target: darwin-arm64
+            asset_suffix: darwin-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: npx vsce package --target ${{ matrix.target }} -o opencode-tui-for-vscode-${{ matrix.asset_suffix }}.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.asset_suffix }}
+          path: opencode-tui-for-vscode-${{ matrix.asset_suffix }}.vsix
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: vsix-files
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          $version = "${{ github.ref_name }}"
+          $prev = git tag --sort=-v:refname | Select-Object -Index 1
+          if (-not $prev) { $prev = "v1.0.0" }
+          $log = git log --oneline --no-decorate "$prev..HEAD" | ForEach-Object { "- $_" }
+          $body = @"
+          ## Downloads
+
+          | Platform | VSIX |
+          |----------|------|
+          | Windows x64 | opencode-tui-for-vscode-win32-x64.vsix |
+          | Linux x64 | opencode-tui-for-vscode-linux-x64.vsix |
+          | macOS Intel | opencode-tui-for-vscode-darwin-x64.vsix |
+          | macOS Apple Silicon | opencode-tui-for-vscode-darwin-arm64.vsix |
+
+          ## What's Changed
+
+          $($log -join "`n")
+
+          ## Full Changelog
+
+          https://github.com/${{ github.repository }}/compare/$prev...$version
+          "@
+          Set-Content -Path release-notes.md -Value $body
+
+      - name: Publish release
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            --title "${{ github.ref_name }}" `
+            --notes-file release-notes.md `
+            (Get-ChildItem -Recurse vsix-files/*.vsix | ForEach-Object { $_.FullName })
+        env:
+          GH_TOKEN: ${{ github.token }}
