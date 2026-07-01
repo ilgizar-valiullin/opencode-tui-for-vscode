@@ -56,13 +56,12 @@ jobs:
           path: vsix-files
 
       - name: Generate release notes
-        id: notes
         run: |
-          $version = "${{ github.ref_name }}"
-          $prev = git tag --sort=-v:refname | Select-Object -Index 1
-          if (-not $prev) { $prev = "v1.0.0" }
-          $log = git log --oneline --no-decorate "$prev..HEAD" | ForEach-Object { "- $_" }
-          $body = @"
+          VERSION="${{ github.ref_name }}"
+          PREV=$(git tag --sort=-v:refname | sed -n '2p')
+          [ -z "$PREV" ] && PREV="v1.0.0"
+          LOG=$(git log --oneline --no-decorate "$PREV..HEAD" | sed 's/^/- /')
+          cat > release-notes.md <<EOF
           ## Downloads
 
           | Platform | VSIX |
@@ -74,19 +73,18 @@ jobs:
 
           ## What's Changed
 
-          $($log -join "`n")
+          $LOG
 
           ## Full Changelog
 
-          https://github.com/${{ github.repository }}/compare/$prev...$version
-          "@
-          Set-Content -Path release-notes.md -Value $body
+          https://github.com/${{ github.repository }}/compare/$PREV...$VERSION
+          EOF
 
       - name: Publish release
         run: |
-          gh release create "${{ github.ref_name }}" `
-            --title "${{ github.ref_name }}" `
-            --notes-file release-notes.md `
-            (Get-ChildItem -Recurse vsix-files/*.vsix | ForEach-Object { $_.FullName })
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file release-notes.md \
+            vsix-files/*/*.vsix
         env:
           GH_TOKEN: ${{ github.token }}
