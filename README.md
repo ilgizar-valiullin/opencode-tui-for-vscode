@@ -9,7 +9,7 @@ Embed [OpenCode](https://opencode.ai) TUI directly in VS Code as a webview panel
 ## Features
 
 - **Full TUI in VS Code** — OpenCode terminal as a sidebar view or tab
-- **Layout-agnostic keyboard** — `event.code`-based interception; works with any keyboard layout
+- **Toggle focus** — `Ctrl+Shift+'` switches between the editor and OpenCode panel (customizable in VS Code keybindings)
 - **Leader key support** — Ctrl+X (physical Ctrl position) activates leader mode regardless of layout
 - **Attach files** — Right-click files or selections in VS Code to attach them to OpenCode context
 - **IDE context awareness** — MCP server exposes current editor state to OpenCode

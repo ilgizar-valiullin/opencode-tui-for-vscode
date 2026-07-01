@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.2.0] — 2026-07-02
+
+### Added
+
+- Focus toggle: `Ctrl+Shift+'` switches between editor and OpenCode panel
+- Focus tracking via webview focusin/focusout/escape events
+- ESLint configuration with TypeScript rules
+- CI: GitHub Actions workflow (typecheck, lint, build, test, package VSIX)
+- docs/architecture.md — architecture documentation
+- docs/keyboard-handling.md — keyboard handling design
+- docs/localization.md — localization guide
+- docs/decisions.md — architecture decision records (10 ADRs)
+
+### Changed
+
+- CI: test step moved after build (was failing on fresh checkout)
+- findNode() now searches PATH on Linux/macOS instead of falling back to Electron
+- writeToStdin/resizePty use if-guard instead of && short-circuit
+
+### Fixed
+
+- Unused import in httpClient.ts removed
+- No Electron ABI fallback for node-pty — clean error if system Node.js not found
+
 ## [1.1.1] — 2026-07-02
 
 ### Added

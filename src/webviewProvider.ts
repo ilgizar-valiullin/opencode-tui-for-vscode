@@ -61,9 +61,29 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
   private panel_: vscode.WebviewPanel | null = null;
   private extensionUri_: vscode.Uri;
   private serverStarted_ = false;
+  private webviewFocused_ = false;
+  private isTabOpen_ = false;
 
   constructor(extensionUri: vscode.Uri) {
     this.extensionUri_ = extensionUri;
+  }
+
+  get viewVisible(): boolean {
+    return !!(this.view_?.visible || this.panel_);
+  }
+
+  toggleFocus(): void {
+    if (this.webviewFocused_) {
+      vscode.commands.executeCommand("workbench.action.focusActiveEditorGroup");
+    } else if (this.view_?.visible) {
+      this.view_?.show?.(true);
+    } else if (this.panel_) {
+      this.panel_.reveal(undefined, true);
+      vscode.commands.executeCommand("workbench.action.focusActiveEditorGroup");
+      this.panel_.reveal(undefined, true);
+    } else {
+      vscode.commands.executeCommand("workbench.view.extension.opencode-tui");
+    }
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -108,6 +128,9 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
     }
     if (msg.type === "textInput") {
       serverManager.writeToStdin(msg.data as string);
+    }
+    if (msg.type === "focusChange") {
+      this.webviewFocused_ = msg.focused as boolean;
     }
   }
 

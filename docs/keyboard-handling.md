@@ -94,6 +94,18 @@ Leader chord characters can be configured via the `opencode-tui-unofficial.leade
 n, l, c, x, g, m, a, e, t, s, b, h, y, u, r, q
 ```
 
+## Focus toggle
+
+`Ctrl+Shift+'` switches focus between the editor and the OpenCode panel:
+
+- If the OpenCode webview has focus → focuses the editor (`workbench.action.focusActiveEditorGroup`)
+- If the editor has focus → reveals and focuses the OpenCode panel
+- If the panel isn't open yet → opens it first
+
+This keybinding can be customized in VS Code's Keyboard Shortcuts editor (`Ctrl+K Ctrl+S`). Search for "Toggle OpenCode Focus".
+
+The webview reports its focus state to the extension host via `focusChange` messages. The `Escape` key in the webview also triggers a focus loss, returning control to the editor.
+
 ## Why this works
 
 | Approach | Mechanism | Cyrillic | Korean | Japanese |

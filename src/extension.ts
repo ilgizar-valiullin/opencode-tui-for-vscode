@@ -33,6 +33,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand("opencode-tui-unofficial.openTerminal", () => provider.openInTab()),
     vscode.commands.registerCommand("opencode-tui-unofficial.openTab", () => provider.openInTab()),
+    vscode.commands.registerCommand("opencode-tui-unofficial.toggleFocus", () => provider.toggleFocus()),
     vscode.commands.registerCommand("opencode-tui-unofficial.stopServer", () => serverManager.stop()),
     vscode.commands.registerCommand("opencode-tui-unofficial.attachFile", (uri: vscode.Uri) => attachFile(uri)),
     vscode.commands.registerCommand("opencode-tui-unofficial.attachFileContext", () => attachSelection()),

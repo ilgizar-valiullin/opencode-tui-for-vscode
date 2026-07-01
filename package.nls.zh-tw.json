@@ -11,5 +11,6 @@
   "config.title": "適用於 VS Code 的 OpenCode TUI",
   "cfg.opencodePath.desc": "opencode 的路徑。例如：'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe'、'opencode.cmd' 或直接 'opencode'。",
   "cfg.serverPort.desc": "opencode 伺服器的連接埠。0 = 隨機可用連接埠。",
+    "cmd.toggleFocus.title": "切換 OpenCode 焦點",
   "cfg.leaderChords.desc": "要攔截的前導和弦字元（例如 [\"n\",\"m\",\"l\"]）。為空則使用 tui.json 或內建預設值。"
 }

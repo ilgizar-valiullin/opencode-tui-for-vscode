@@ -11,5 +11,6 @@
   "config.title": "OpenCode TUI für VS Code",
   "cfg.opencodePath.desc": "Pfad zu opencode. Z.B. 'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe', 'opencode.cmd' oder einfach 'opencode'.",
   "cfg.serverPort.desc": "Port für den opencode-Server. 0 = zufälliger freier Port.",
+    "cmd.toggleFocus.title": "OpenCode-Fokus umschalten",
   "cfg.leaderChords.desc": "Leader-Chord-Zeichen zum Abfangen (z.B. [\"n\",\"m\",\"l\"]). Leer = tui.json oder integrierte Standardeinstellungen verwenden."
 }

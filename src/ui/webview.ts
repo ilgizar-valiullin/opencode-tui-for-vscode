@@ -105,4 +105,13 @@ term.onData((data: string) => {
 
 el.addEventListener("click", () => term.focus());
 
+el.addEventListener("focusin", () => vscode.postMessage({ type: "focusChange", focused: true }));
+el.addEventListener("focusout", () => vscode.postMessage({ type: "focusChange", focused: false }));
+
+document.addEventListener("keydown", (e: KeyboardEvent) => {
+  if (e.key === "Escape" && el.contains(document.activeElement)) {
+    vscode.postMessage({ type: "focusChange", focused: false });
+  }
+}, true);
+
 vscode.postMessage({ type: "ready" });

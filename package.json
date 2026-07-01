@@ -66,6 +66,22 @@
       {
         "command": "opencode-tui-unofficial.attachFileContext",
         "title": "%cmd.attachFile.title%"
+      },
+      {
+        "command": "opencode-tui-unofficial.toggleFocus",
+        "title": "%cmd.toggleFocus.title%"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "opencode-tui-unofficial.toggleFocus",
+        "key": "ctrl+shift+'",
+        "when": "!editorFocus"
+      },
+      {
+        "command": "opencode-tui-unofficial.toggleFocus",
+        "key": "ctrl+shift+'",
+        "when": "editorFocus"
       }
     ],
     "menus": {

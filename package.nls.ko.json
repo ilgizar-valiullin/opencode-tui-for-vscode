@@ -11,5 +11,6 @@
   "config.title": "VS Code용 OpenCode TUI",
   "cfg.opencodePath.desc": "opencode 경로. 예: 'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe', 'opencode.cmd', 또는 'opencode'.",
   "cfg.serverPort.desc": "opencode 서버 포트. 0 = 사용 가능한 임의 포트.",
+    "cmd.toggleFocus.title": "OpenCode 포커스 전환",
   "cfg.leaderChords.desc": "가로챌 리더 코드 문자 (예: [\"n\",\"m\",\"l\"]). 비어 있으면 tui.json 또는 내장 기본값 사용."
 }
