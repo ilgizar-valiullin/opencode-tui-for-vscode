@@ -4,10 +4,24 @@ import { serverManager } from "../opencodeServer";
 
 const ENTER_DELAY_MS = 150;
 
+const BINARY_EXTS = new Set([
+  "png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "svg",
+  "pdf",
+]);
+
+function isBinaryFile(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase().replace(".", "");
+  return BINARY_EXTS.has(ext);
+}
+
 async function typeAndSubmit(text: string): Promise<void> {
   serverManager.writeToStdin(text);
   await new Promise((r) => setTimeout(r, ENTER_DELAY_MS));
   serverManager.writeToStdin("\r");
+}
+
+async function pasteInPlace(text: string): Promise<void> {
+  serverManager.writeToStdin(`\x1b[200~${text}\x1b[201~\n`);
 }
 
 async function getRelativePath(filePath: string): Promise<string | null> {
@@ -29,7 +43,12 @@ export async function attachFile(uri: vscode.Uri): Promise<void> {
     vscode.window.showErrorMessage("OpenCode server is not running");
     return;
   }
-  const rel = await getRelativePath(uri.fsPath);
+  const absPath = uri.fsPath;
+  if (isBinaryFile(absPath)) {
+    await pasteInPlace(absPath);
+    return;
+  }
+  const rel = await getRelativePath(absPath);
   if (rel === null) return;
   await typeAndSubmit(`@${rel}`);
 }
