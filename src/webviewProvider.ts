@@ -75,14 +75,18 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
   toggleFocus(): void {
     if (this.webviewFocused_) {
       vscode.commands.executeCommand("workbench.action.focusActiveEditorGroup");
-    } else if (this.view_?.visible) {
-      this.view_?.show?.(true);
+      return;
+    }
+    const wv = this.view_?.webview ?? this.panel_?.webview;
+    if (this.view_?.visible) {
+      this.view_?.show?.(false);
     } else if (this.panel_) {
-      this.panel_.reveal(undefined, true);
-      vscode.commands.executeCommand("workbench.action.focusActiveEditorGroup");
-      this.panel_.reveal(undefined, true);
+      this.panel_.reveal(undefined, false);
     } else {
       vscode.commands.executeCommand("workbench.view.extension.opencode-tui");
+    }
+    if (wv) {
+      wv.postMessage({ type: "focusTerminal" });
     }
   }
 

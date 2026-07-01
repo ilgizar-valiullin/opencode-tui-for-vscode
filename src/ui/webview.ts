@@ -35,6 +35,7 @@ new ResizeObserver(() => {
 
 window.addEventListener("message", (e) => {
   if (e.data.type === "terminalData") term.write(e.data.data as string);
+  if (e.data.type === "focusTerminal") term.focus();
 });
 
 const LEADER_TIMEOUT = 2000;
