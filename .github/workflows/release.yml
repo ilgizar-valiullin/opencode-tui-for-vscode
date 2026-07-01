@@ -15,7 +15,7 @@ jobs:
           - os: windows-latest
             target: win32-x64
             asset_suffix: win32-x64
-          - os: macos-13
+          - os: ubuntu-latest
             target: darwin-x64
             asset_suffix: darwin-x64
           - os: macos-latest
