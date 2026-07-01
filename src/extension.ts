@@ -1,15 +1,41 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import * as path from "path";
+import * as crypto from "crypto";
+import * as os from "os";
 import { serverManager } from "./opencodeServer";
 import { OpenCodeWebviewProvider } from "./webviewProvider";
+import { attachFile, attachSelection } from "./commands/attachFile";
+import { createMcpServer } from "./mcp-server";
+import { vscodeEditorState } from "./vscode-editor-state";
 
-export function activate(context: vscode.ExtensionContext) {
+function findDataDir(): string {
+  if (process.platform === "win32" && process.env.APPDATA) {
+    return process.env.APPDATA;
+  }
+  if (process.env.XDG_DATA_HOME) {
+    return process.env.XDG_DATA_HOME;
+  }
+  return path.join(os.homedir(), ".local", "share");
+}
+
+export async function activate(context: vscode.ExtensionContext) {
   console.log("[opencode] activate start");
 
   const provider = new OpenCodeWebviewProvider(context.extensionUri);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("opencode-tui-unofficial.openTerminal", () => provider.open()),
-    vscode.commands.registerCommand("opencode-tui-unofficial.stopServer", () => serverManager.stop())
+    vscode.window.registerWebviewViewProvider("opencode-tui.view", provider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.focusView", () => {
+      vscode.commands.executeCommand("workbench.view.extension.opencode-tui");
+    }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.openTerminal", () => provider.openInTab()),
+    vscode.commands.registerCommand("opencode-tui-unofficial.openTab", () => provider.openInTab()),
+    vscode.commands.registerCommand("opencode-tui-unofficial.stopServer", () => serverManager.stop()),
+    vscode.commands.registerCommand("opencode-tui-unofficial.attachFile", (uri: vscode.Uri) => attachFile(uri)),
+    vscode.commands.registerCommand("opencode-tui-unofficial.attachFileContext", () => attachSelection()),
   );
 
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -18,7 +44,61 @@ export function activate(context: vscode.ExtensionContext) {
   statusBar.show();
   context.subscriptions.push(statusBar);
 
+  // --- MCP Server for IDE Context Awareness ---
+  try {
+    const authToken = crypto.randomUUID();
+    const version = context.extension.packageJSON.version ?? "0.0.0";
+
+    const mcpHandle = await createMcpServer(vscodeEditorState, version, authToken);
+
+    const ideDir = path.join(findDataDir(), "opencode", "ide");
+    fs.mkdirSync(ideDir, { recursive: true });
+    const lockFilePath = path.join(ideDir, `${mcpHandle.port}.lock`);
+
+    const lockContent = JSON.stringify({
+      pid: process.pid,
+      workspaceFolders: (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
+      authToken,
+    });
+    const tmpPath = lockFilePath + ".tmp";
+    fs.writeFileSync(tmpPath, lockContent, { mode: 0o600 });
+    fs.renameSync(tmpPath, lockFilePath);
+
+    serverManager.setMcpPort(mcpHandle.port);
+
+    const EDITOR_NOTIFY_DEBOUNCE_MS = 150;
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+    function notifyDebounced() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        mcpHandle.notifyContextChanged().catch(() => {});
+      }, EDITOR_NOTIFY_DEBOUNCE_MS);
+    }
+
+    context.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor(() => notifyDebounced()),
+      vscode.window.onDidChangeTextEditorSelection(() => notifyDebounced()),
+      {
+        dispose() {
+          if (debounceTimer) clearTimeout(debounceTimer);
+        },
+      },
+      {
+        dispose() {
+          mcpHandle.close().catch(() => {});
+          try { fs.unlinkSync(lockFilePath); } catch {}
+        },
+      },
+    );
+
+    console.log(`[opencode] MCP server started on port ${mcpHandle.port}`);
+  } catch (err) {
+    console.error("[opencode] MCP server failed to start", err);
+  }
+
   console.log("[opencode] activate done");
 }
 
-export function deactivate() { serverManager.stop().catch(() => {}); }
+export function deactivate() {
+  serverManager.stop().catch(() => {});
+}

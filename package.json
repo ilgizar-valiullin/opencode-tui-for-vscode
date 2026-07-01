@@ -2,9 +2,13 @@
   "name": "opencode-tui-unofficial",
   "displayName": "OpenCode TUI Integration",
   "description": "OpenCode TUI embedded in VS Code with proper keyboard handling for non-Latin layouts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "opencode-tui-unofficial",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ilgizar-valiullin/opencode-tui-integration-unofficial.git"
+  },
   "engines": {
     "vscode": "^1.84.0"
   },
@@ -12,20 +16,85 @@
     "Other"
   ],
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "opencode-tui",
+          "title": "OpenCode",
+          "icon": "images/dark-theme.svg"
+        }
+      ]
+    },
+    "views": {
+      "opencode-tui": [
+        {
+          "type": "webview",
+          "id": "opencode-tui.view",
+          "name": "Terminal"
+        }
+      ]
+    },
     "commands": [
+      {
+        "command": "opencode-tui-unofficial.focusView",
+        "title": "OpenCode",
+        "icon": {
+          "light": "images/light-theme.svg",
+          "dark": "images/dark-theme.svg"
+        }
+      },
       {
         "command": "opencode-tui-unofficial.openTerminal",
         "title": "OpenCode: Open Terminal"
       },
       {
+        "command": "opencode-tui-unofficial.openTab",
+        "title": "OpenCode: Open Terminal (Tab)"
+      },
+      {
         "command": "opencode-tui-unofficial.stopServer",
         "title": "OpenCode: Stop Server"
+      },
+      {
+        "command": "opencode-tui-unofficial.attachFile",
+        "title": "OpenCode: Attach File"
+      },
+      {
+        "command": "opencode-tui-unofficial.attachFileContext",
+        "title": "OpenCode: Attach File"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "opencode-tui-unofficial.focusView",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "opencode-tui-unofficial.attachFileContext",
+          "group": "9_opencode"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "opencode-tui-unofficial.attachFile",
+          "group": "3_opencode",
+          "when": "resourceScheme == file"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "opencode-tui-unofficial.attachFile",
+          "group": "5_opencode"
+        }
+      ]
+    },
     "configuration": {
       "title": "OpenCode TUI Integration",
       "properties": {
@@ -39,10 +108,14 @@
           "default": 0,
           "description": "Port for opencode server. 0 = random available port."
         },
-        "opencode-tui-unofficial.leaderKey": {
-          "type": "string",
-          "default": "KeyX",
-          "description": "event.code value for the leader key. Default 'KeyX' = physical X key."
+        "opencode-tui-unofficial.leaderChords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]$"
+          },
+          "default": [],
+          "description": "Leader chord characters to intercept (e.g. [\"n\",\"m\",\"l\"]). Empty = use tui.json or built-in defaults."
         }
       }
     }
@@ -61,6 +134,7 @@
     "typescript": "^5.5.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@xterm/addon-fit": "^0.10.0",
     "node-pty": "^1.1.0"
   }

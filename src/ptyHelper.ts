@@ -39,6 +39,9 @@ rl.on("line", (line: string) => {
     delete env.VSCODE_IPC_HOOK;
     delete env.VSCODE_GIT_IPC_HANDLE;
 
+    const mcpPort = (msg as any).mcpPort;
+    if (mcpPort) env.OPENCODE_MCP_PORT = String(mcpPort);
+
     pty = spawn(msg.path, args, {
       name: "xterm-256color",
       cols: 80,

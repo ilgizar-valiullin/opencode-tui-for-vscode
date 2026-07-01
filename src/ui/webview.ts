@@ -3,6 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
 declare const acquireVsCodeApi: () => { postMessage(msg: unknown): void };
+declare const __LEADER_CHORDS__: string[] | undefined;
 
 const vscode = acquireVsCodeApi();
 
@@ -36,7 +37,69 @@ window.addEventListener("message", (e) => {
   if (e.data.type === "terminalData") term.write(e.data.data as string);
 });
 
+const LEADER_TIMEOUT = 2000;
+const leaderChords = new Set<string>(
+  __LEADER_CHORDS__ ?? ["n","l","c","x","g","m","a","e","t","s","b","h","y","u","r","q"],
+);
+let leaderActive = false;
+let leaderTimer: ReturnType<typeof setTimeout> | null = null;
+
+function codeToAscii(code: string, shift: boolean): string | null {
+  if (code.startsWith("Key")) {
+    const letter = code.slice(3).toLowerCase();
+    if (letter.length === 1 && /[a-z]/.test(letter)) return letter;
+    return null;
+  }
+  if (code.startsWith("Digit")) {
+    const digit = code.slice(5);
+    if (shift) {
+      const shifted: Record<string, string> = {
+        "0": ")", "1": "!", "2": "@", "3": "#", "4": "$",
+        "5": "%", "6": "^", "7": "&", "8": "*", "9": "(",
+      };
+      return shifted[digit] ?? null;
+    }
+    return digit;
+  }
+  const simple: Record<string, string> = {
+    Minus: "-", Equal: "=", BracketLeft: "[", BracketRight: "]",
+    Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/",
+    Backquote: "`", Backslash: "\\", Space: " ", IntlBackslash: "\\",
+  };
+  if (code in simple) return simple[code];
+  return null;
+}
+
+function clearLeader() {
+  leaderActive = false;
+  if (leaderTimer !== null) {
+    clearTimeout(leaderTimer);
+    leaderTimer = null;
+  }
+}
+
+document.addEventListener("keydown", (e: KeyboardEvent) => {
+  if (!leaderActive) return;
+  if (!el.contains(e.target as Node)) return;
+  if (e.code === "Escape") {
+    clearLeader();
+    return;
+  }
+  const ascii = codeToAscii(e.code, e.shiftKey);
+  if (ascii === null || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (!leaderChords.has(ascii)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  clearLeader();
+  vscode.postMessage({ type: "textInput", data: ascii });
+}, true);
+
 term.onData((data: string) => {
+  if (data === "\x18") {
+    leaderActive = true;
+    if (leaderTimer !== null) clearTimeout(leaderTimer);
+    leaderTimer = setTimeout(clearLeader, LEADER_TIMEOUT);
+  }
   vscode.postMessage({ type: "textInput", data });
 });
 

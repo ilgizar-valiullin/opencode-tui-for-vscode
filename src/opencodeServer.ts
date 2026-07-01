@@ -14,11 +14,17 @@ export class OpenCodeServerManager {
   private helper_: ChildProcess | null = null;
   private port_: number = 0;
   private client_: OpenCodeClient | null = null;
+  private cwd_: string = "";
+  private mcpPort_: number = 0;
   private stdoutCallback_: ((data: string) => void) | null = null;
   private stdoutBuffer_: string[] = [];
 
+  get mcpPort(): number { return this.mcpPort_; }
+  setMcpPort(port: number): void { this.mcpPort_ = port; }
+
   get client(): OpenCodeClient | null { return this.client_; }
   get port(): number { return this.port_; }
+  get cwd(): string { return this.cwd_; }
 
   onStdout(cb: (data: string) => void): void {
     this.stdoutCallback_ = cb;
@@ -39,6 +45,7 @@ export class OpenCodeServerManager {
   async start(openCodePath: string, preferredPort?: number, cwd?: string): Promise<void> {
     if (this.helper_) return;
     this.port_ = preferredPort && preferredPort > 0 ? preferredPort : await findFreePort();
+    this.cwd_ = cwd ?? process.cwd();
     const ocPath = resolveOcPath(openCodePath);
     const helperPath = path.resolve(__dirname, "ptyHelper.js");
     const nodeExe = findNode();
@@ -100,6 +107,7 @@ export class OpenCodeServerManager {
 
       const spawnMsg: Record<string, unknown> = { type: "spawn", path: ocPath, port: this.port_ };
       if (cwd) spawnMsg.cwd = cwd;
+      if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
 
       this.helper_.stdin?.write(JSON.stringify(spawnMsg) + "\n");
 

@@ -94,6 +94,17 @@ export class OpenCodeClient {
     });
   }
 
+  async sendMessageAsync(
+    sessionId: string,
+    parts: unknown[],
+    opts?: { model?: string; agent?: string }
+  ): Promise<boolean> {
+    return this.request<boolean>("POST", `/session/${sessionId}/prompt_async`, {
+      parts,
+      ...opts,
+    });
+  }
+
   // ─── TUI Commands ───
 
   async executeTuiCommand(command: TuiCommandId): Promise<boolean> {
