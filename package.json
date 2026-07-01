@@ -1,8 +1,8 @@
 {
   "name": "opencode-tui-unofficial",
-  "displayName": "OpenCode TUI Integration",
-  "description": "OpenCode TUI embedded in VS Code with proper keyboard handling for non-Latin layouts",
-  "version": "1.1.0",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "1.1.1",
   "publisher": "opencode-tui-unofficial",
   "license": "MIT",
   "repository": {
@@ -24,7 +24,7 @@
       "secondarySidebar": [
         {
           "id": "opencode-tui",
-          "title": "OpenCode",
+          "title": "%viewContainer.title%",
           "icon": "images/dark-theme.svg"
         }
       ]
@@ -34,14 +34,14 @@
         {
           "type": "webview",
           "id": "opencode-tui.view",
-          "name": "Terminal"
+          "name": "%view.terminal.name%"
         }
       ]
     },
     "commands": [
       {
         "command": "opencode-tui-unofficial.focusView",
-        "title": "OpenCode",
+        "title": "%cmd.focusView.title%",
         "icon": {
           "light": "images/light-theme.svg",
           "dark": "images/dark-theme.svg"
@@ -49,23 +49,23 @@
       },
       {
         "command": "opencode-tui-unofficial.openTerminal",
-        "title": "OpenCode: Open Terminal"
+        "title": "%cmd.openTerminal.title%"
       },
       {
         "command": "opencode-tui-unofficial.openTab",
-        "title": "OpenCode: Open Terminal (Tab)"
+        "title": "%cmd.openTab.title%"
       },
       {
         "command": "opencode-tui-unofficial.stopServer",
-        "title": "OpenCode: Stop Server"
+        "title": "%cmd.stopServer.title%"
       },
       {
         "command": "opencode-tui-unofficial.attachFile",
-        "title": "OpenCode: Attach File"
+        "title": "%cmd.attachFile.title%"
       },
       {
         "command": "opencode-tui-unofficial.attachFileContext",
-        "title": "OpenCode: Attach File"
+        "title": "%cmd.attachFile.title%"
       }
     ],
     "menus": {
@@ -96,17 +96,17 @@
       ]
     },
     "configuration": {
-      "title": "OpenCode TUI Integration",
+      "title": "%config.title%",
       "properties": {
         "opencode-tui-unofficial.opencodePath": {
           "type": "string",
           "default": "opencode",
-          "description": "Path to opencode. E.g. 'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe', 'opencode.cmd', or just 'opencode'."
+          "description": "%cfg.opencodePath.desc%"
         },
         "opencode-tui-unofficial.serverPort": {
           "type": "integer",
           "default": 0,
-          "description": "Port for opencode server. 0 = random available port."
+          "description": "%cfg.serverPort.desc%"
         },
         "opencode-tui-unofficial.leaderChords": {
           "type": "array",
@@ -115,7 +115,7 @@
             "pattern": "^[a-z0-9]$"
           },
           "default": [],
-          "description": "Leader chord characters to intercept (e.g. [\"n\",\"m\",\"l\"]). Empty = use tui.json or built-in defaults."
+          "description": "%cfg.leaderChords.desc%"
         }
       }
     }

@@ -1,0 +1,15 @@
+{
+  "displayName": "OpenCode TUI 통합",
+  "description": "VS Code에 OpenCode TUI를 내장하여 비라틴 키보드 레이아웃에서도 올바른 키보드 처리 제공",
+  "viewContainer.title": "OpenCode",
+  "view.terminal.name": "터미널",
+  "cmd.focusView.title": "OpenCode",
+  "cmd.openTerminal.title": "OpenCode: 터미널 열기",
+  "cmd.openTab.title": "OpenCode: 터미널 열기 (탭)",
+  "cmd.stopServer.title": "OpenCode: 서버 중지",
+  "cmd.attachFile.title": "OpenCode에 첨부",
+  "config.title": "OpenCode TUI 통합",
+  "cfg.opencodePath.desc": "opencode 경로. 예: 'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe', 'opencode.cmd', 또는 'opencode'.",
+  "cfg.serverPort.desc": "opencode 서버 포트. 0 = 사용 가능한 임의 포트.",
+  "cfg.leaderChords.desc": "가로챌 리더 코드 문자 (예: [\"n\",\"m\",\"l\"]). 비어 있으면 tui.json 또는 내장 기본값 사용."
+}

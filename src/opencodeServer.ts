@@ -156,7 +156,16 @@ function findNode(): string {
       if (existsSync(c)) return c;
     }
   }
-  return process.execPath;
+  const binName = process.platform === "win32" ? "node.exe" : "node";
+  const pathDirs = (process.env.PATH || "").split(path.delimiter);
+  for (const dir of pathDirs) {
+    const full = path.join(dir, binName);
+    try { if (existsSync(full)) return full; } catch { /* */ }
+  }
+  throw new Error(
+    "System Node.js not found. Install Node.js from https://nodejs.org " +
+    "(required for node-pty native module compatibility)."
+  );
 }
 
 function resolveOcPath(configPath: string): string {

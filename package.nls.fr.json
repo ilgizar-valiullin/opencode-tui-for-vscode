@@ -1,0 +1,15 @@
+{
+  "displayName": "Intégration OpenCode TUI",
+  "description": "OpenCode TUI intégré dans VS Code avec une gestion correcte du clavier pour les dispositions non latines",
+  "viewContainer.title": "OpenCode",
+  "view.terminal.name": "Terminal",
+  "cmd.focusView.title": "OpenCode",
+  "cmd.openTerminal.title": "OpenCode : Ouvrir le terminal",
+  "cmd.openTab.title": "OpenCode : Ouvrir le terminal (onglet)",
+  "cmd.stopServer.title": "OpenCode : Arrêter le serveur",
+  "cmd.attachFile.title": "Joindre à OpenCode",
+  "config.title": "Intégration OpenCode TUI",
+  "cfg.opencodePath.desc": "Chemin vers opencode. Ex. : 'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe', 'opencode.cmd', ou simplement 'opencode'.",
+  "cfg.serverPort.desc": "Port du serveur opencode. 0 = port disponible aléatoire.",
+  "cfg.leaderChords.desc": "Caractères d'accord leader à intercepter (ex. [\"n\",\"m\",\"l\"]). Vide = utiliser tui.json ou les valeurs par défaut intégrées."
+}

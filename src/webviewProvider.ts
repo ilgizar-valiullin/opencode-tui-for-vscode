@@ -90,9 +90,11 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         await serverManager.start(openCodePath, undefined, workspaceFolder);
       } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        vscode.window.showErrorMessage(vscode.l10n.t("Failed to start OpenCode: {0}", msg));
         webview.postMessage({
           type: "terminalData",
-          data: `\r\n\x1b[31mFailed to start OpenCode: ${err?.message ?? err}\x1b[0m\r\n`,
+          data: `\r\n\x1b[31m${vscode.l10n.t("Failed to start OpenCode: {0}", msg)}\x1b[0m\r\n`,
         });
         return;
       }

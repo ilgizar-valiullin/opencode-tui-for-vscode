@@ -1,0 +1,15 @@
+{
+  "displayName": "OpenCode TUI 集成",
+  "description": "在 VS Code 中嵌入 OpenCode TUI，为非拉丁键盘布局提供正确的键盘处理",
+  "viewContainer.title": "OpenCode",
+  "view.terminal.name": "终端",
+  "cmd.focusView.title": "OpenCode",
+  "cmd.openTerminal.title": "OpenCode: 打开终端",
+  "cmd.openTab.title": "OpenCode: 打开终端（标签页）",
+  "cmd.stopServer.title": "OpenCode: 停止服务器",
+  "cmd.attachFile.title": "附加到 OpenCode",
+  "config.title": "OpenCode TUI 集成",
+  "cfg.opencodePath.desc": "opencode 的路径。例如：'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe'、'opencode.cmd' 或直接 'opencode'。",
+  "cfg.serverPort.desc": "opencode 服务器的端口。0 = 随机可用端口。",
+  "cfg.leaderChords.desc": "要拦截的前导和弦字符（例如 [\"n\",\"m\",\"l\"]）。为空则使用 tui.json 或内置默认值。"
+}
