@@ -1,0 +1,67 @@
+{
+  "name": "opencode-tui-unofficial",
+  "displayName": "OpenCode TUI Integration",
+  "description": "OpenCode TUI embedded in VS Code with proper keyboard handling for non-Latin layouts",
+  "version": "1.0.0",
+  "publisher": "opencode-tui-unofficial",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "opencode-tui-unofficial.openTerminal",
+        "title": "OpenCode: Open Terminal"
+      },
+      {
+        "command": "opencode-tui-unofficial.stopServer",
+        "title": "OpenCode: Stop Server"
+      }
+    ],
+    "configuration": {
+      "title": "OpenCode TUI Integration",
+      "properties": {
+        "opencode-tui-unofficial.opencodePath": {
+          "type": "string",
+          "default": "opencode",
+          "description": "Path to opencode. E.g. 'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe', 'opencode.cmd', or just 'opencode'."
+        },
+        "opencode-tui-unofficial.serverPort": {
+          "type": "integer",
+          "default": 0,
+          "description": "Port for opencode server. 0 = random available port."
+        },
+        "opencode-tui-unofficial.leaderKey": {
+          "type": "string",
+          "default": "KeyX",
+          "description": "event.code value for the leader key. Default 'KeyX' = physical X key."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "package": "node esbuild.mjs && vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/vscode": "^1.84.0",
+    "@vscode/vsce": "^3.0.0",
+    "@xterm/xterm": "^5.5.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "node-pty": "^1.1.0"
+  }
+}
