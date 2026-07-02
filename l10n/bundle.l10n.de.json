@@ -1,3 +1,15 @@
 {
-  "Failed to start OpenCode: {0}": "OpenCode konnte nicht gestartet werden: {0}"
+  "Failed to start OpenCode: {0}": "OpenCode konnte nicht gestartet werden: {0}",
+  "Failed to restart: {0}": "Neustart fehlgeschlagen: {0}",
+  "Failed to start: {0}": "Start fehlgeschlagen: {0}",
+  "Settings": "Einstellungen",
+  "OpenCode Path": "OpenCode-Pfad",
+  "Path to opencode executable, e.g. 'opencode' or full path to binary": "Pfad zur opencode-Datei, z.B. 'opencode' oder vollständiger Pfad",
+  "Server Port": "Server-Port",
+  "Port for opencode REST API. 0 = auto (random free port on each start)": "Port für die opencode-REST-API. 0 = automatisch (zufälliger freier Port bei jedem Start)",
+  "Leader Chords": "Leader-Chords",
+  "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "Tasten für den Leader-Modus (Strg+X + Buchstabe). Kommagetrennt, z.B. n,l,c,x,g,m",
+  "Ctrl+A Select All (fix)": "Alles auswählen mit Strg+A (Korrektur)",
+  "Cancel": "Abbrechen",
+  "Save": "Speichern"
 }

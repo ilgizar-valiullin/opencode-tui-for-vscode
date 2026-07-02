@@ -1,3 +1,15 @@
 {
-  "Failed to start OpenCode: {0}": "Не удалось запустить OpenCode: {0}"
+  "Failed to start OpenCode: {0}": "Не удалось запустить OpenCode: {0}",
+  "Failed to restart: {0}": "Не удалось перезапустить: {0}",
+  "Failed to start: {0}": "Не удалось запустить: {0}",
+  "Settings": "Настройки",
+  "OpenCode Path": "Путь к OpenCode",
+  "Path to opencode executable, e.g. 'opencode' or full path to binary": "Путь к исполняемому файлу opencode, например 'opencode' или полный путь",
+  "Server Port": "Порт сервера",
+  "Port for opencode REST API. 0 = auto (random free port on each start)": "Порт для REST API opencode. 0 = авто (случайный свободный порт при каждом запуске)",
+  "Leader Chords": "Лидер-аккорды",
+  "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "Клавиши для лидер-режима (Ctrl+X + буква). Через запятую, например n,l,c,x,g,m",
+  "Ctrl+A Select All (fix)": "Выделение всего по Ctrl+A (исправление)",
+  "Cancel": "Отмена",
+  "Save": "Сохранить"
 }

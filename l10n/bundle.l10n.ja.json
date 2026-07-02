@@ -1,3 +1,15 @@
 {
-  "Failed to start OpenCode: {0}": "OpenCode の起動に失敗しました: {0}"
+  "Failed to start OpenCode: {0}": "OpenCode の起動に失敗しました: {0}",
+  "Failed to restart: {0}": "再起動に失敗しました: {0}",
+  "Failed to start: {0}": "起動に失敗しました: {0}",
+  "Settings": "設定",
+  "OpenCode Path": "OpenCode のパス",
+  "Path to opencode executable, e.g. 'opencode' or full path to binary": "opencode 実行ファイルへのパス。例: 'opencode' またはフルパス",
+  "Server Port": "サーバーポート",
+  "Port for opencode REST API. 0 = auto (random free port on each start)": "opencode REST API のポート。0 = 自動（起動ごとにランダムな空きポート）",
+  "Leader Chords": "リーダーコード",
+  "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "リーダーモードのキー（Ctrl+X + 文字）。カンマ区切り。例: n,l,c,x,g,m",
+  "Ctrl+A Select All (fix)": "Ctrl+A で全選択（修正）",
+  "Cancel": "キャンセル",
+  "Save": "保存"
 }

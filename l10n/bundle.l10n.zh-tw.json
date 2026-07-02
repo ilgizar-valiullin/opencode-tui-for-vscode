@@ -1,3 +1,15 @@
 {
-  "Failed to start OpenCode: {0}": "OpenCode 啟動失敗：{0}"
+  "Failed to start OpenCode: {0}": "OpenCode 啟動失敗：{0}",
+  "Failed to restart: {0}": "重新啟動失敗：{0}",
+  "Failed to start: {0}": "啟動失敗：{0}",
+  "Settings": "設定",
+  "OpenCode Path": "OpenCode 路徑",
+  "Path to opencode executable, e.g. 'opencode' or full path to binary": "opencode 可執行檔路徑，例如 'opencode' 或完整路徑",
+  "Server Port": "伺服器連接埠",
+  "Port for opencode REST API. 0 = auto (random free port on each start)": "opencode REST API 連接埠。0 = 自動（每次啟動時隨機分配可用連接埠）",
+  "Leader Chords": "Leader 組合鍵",
+  "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "Leader 模式按鍵（Ctrl+X + 字母）。逗號分隔，例如 n,l,c,x,g,m",
+  "Ctrl+A Select All (fix)": "Ctrl+A 全選（修正）",
+  "Cancel": "取消",
+  "Save": "儲存"
 }

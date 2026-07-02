@@ -195,6 +195,24 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
     if (msg.type === "focusChange") {
       this.webviewFocused_ = msg.focused as boolean;
     }
+    if (msg.type === "openSettings") {
+      const cfg = vscode.workspace.getConfiguration("opencode-tui-unofficial");
+      webview.postMessage({
+        type: "settingsData",
+        opencodePath: cfg.get<string>("opencodePath", "opencode"),
+        serverPort: cfg.get<number>("serverPort", 0),
+        leaderChords: cfg.get<string[]>("leaderChords", []),
+        ctrlASelectAll: cfg.get<boolean>("ctrlASelectAll", true),
+      });
+    }
+    if (msg.type === "saveSettings") {
+      const s = msg as Record<string, unknown>;
+      const cfg = vscode.workspace.getConfiguration("opencode-tui-unofficial");
+      await cfg.update("opencodePath", s.opencodePath, vscode.ConfigurationTarget.Global);
+      await cfg.update("serverPort", s.serverPort as number, vscode.ConfigurationTarget.Global);
+      await cfg.update("leaderChords", s.leaderChords as string[], vscode.ConfigurationTarget.Global);
+      await cfg.update("ctrlASelectAll", s.ctrlASelectAll as boolean, vscode.ConfigurationTarget.Global);
+    }
   }
 
   async openInTab(): Promise<void> {
@@ -247,10 +265,28 @@ html,body{height:100%;background:#0d1117;overflow:hidden}
 #statusbar button:hover{background:rgba(255,255,255,0.1)}
 #statusbar button:active{background:rgba(255,255,255,0.2)}
 #statusbar button:disabled{opacity:0.5;cursor:default}
+#settingsOverlay{display:none;position:fixed;top:0;left:0;right:0;bottom:22px;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center}
+#settingsOverlay.open{display:flex}
+#settingsPanel{background:#1c2333;border:1px solid #30363d;border-radius:6px;padding:20px;width:420px;max-height:80vh;overflow-y:auto;color:#c9d1d9;font-size:13px;font-family:system-ui,-apple-system,sans-serif}
+#settingsPanel h2{margin:0 0 16px;font-size:16px;color:#f0f6fc}
+#settingsPanel .field{margin-bottom:12px}
+#settingsPanel label{display:block;margin-bottom:4px;color:#8b949e;font-size:12px}
+#settingsPanel .desc{color:#6e7681;font-size:11px;margin:2px 0 6px;line-height:1.4}
+#settingsPanel code{color:#8b949e;font-size:inherit}
+#settingsPanel input[type="text"],#settingsPanel input[type="number"]{width:100%;padding:6px 8px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;box-sizing:border-box}
+#settingsPanel input[type="checkbox"]{margin-right:6px}
+#settingsPanel .checkbox-row{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+#settingsPanel .btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+#settingsPanel .btn-row button{padding:6px 16px;border:1px solid #30363d;border-radius:4px;cursor:pointer;font-size:12px}
+#settingsPanel .btn-row .btn-primary{background:#238636;color:#fff;border-color:#238636}
+#settingsPanel .btn-row .btn-primary:hover{background:#2ea043}
+#settingsPanel .btn-row .btn-secondary{background:transparent;color:#c9d1d9}
+#settingsPanel .btn-row .btn-secondary:hover{background:rgba(255,255,255,0.1)}
 </style>
 </head><body>
 <div id="terminal"></div>
-<div id="statusbar"><span class="addr-info">Starting...</span><button id="restartBtn">Restart</button><button id="toggleBtn">Shutdown</button></div>
+<div id="statusbar"><span class="addr-info">Starting...</span><button id="restartBtn">Restart</button><button id="toggleBtn">Shutdown</button><button id="settingsBtn">&#9881;</button></div>
+<div id="settingsOverlay"><div id="settingsPanel"><h2>${vscode.l10n.t("Settings")}</h2><div class="field"><label for="setOpenCodePath">${vscode.l10n.t("OpenCode Path")}</label><div class="desc">${vscode.l10n.t("Path to opencode executable, e.g. 'opencode' or full path to binary")}</div><input type="text" id="setOpenCodePath" /></div><div class="field"><label for="setServerPort">${vscode.l10n.t("Server Port")}</label><div class="desc">${vscode.l10n.t("Port for opencode REST API. 0 = auto (random free port on each start)")}</div><input type="number" id="setServerPort" /></div><div class="field"><label for="setLeaderChords">${vscode.l10n.t("Leader Chords")}</label><div class="desc">${vscode.l10n.t("Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m")}</div><input type="text" id="setLeaderChords" placeholder="n,l,c,x,g,m,..." /></div><div class="checkbox-row"><input type="checkbox" id="setCtrlASelectAll" /><label for="setCtrlASelectAll" style="margin:0">${vscode.l10n.t("Ctrl+A Select All (fix)")}</label></div><div class="btn-row"><button class="btn-secondary" id="settingsCancelBtn">${vscode.l10n.t("Cancel")}</button><button class="btn-primary" id="settingsSaveBtn">${vscode.l10n.t("Save")}</button></div></div></div>
 <script nonce="${nonce}">var __LEADER_CHORDS__=${JSON.stringify(chords)};var __CTRL_A_SELECT_ALL__=${ctrlASelectAll}</script>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body></html>`;

@@ -1,3 +1,15 @@
 {
-  "Failed to start OpenCode: {0}": "Failed to start OpenCode: {0}"
+  "Failed to start OpenCode: {0}": "Failed to start OpenCode: {0}",
+  "Failed to restart: {0}": "Failed to restart: {0}",
+  "Failed to start: {0}": "Failed to start: {0}",
+  "Settings": "Settings",
+  "OpenCode Path": "OpenCode Path",
+  "Path to opencode executable, e.g. 'opencode' or full path to binary": "Path to opencode executable, e.g. 'opencode' or full path to binary",
+  "Server Port": "Server Port",
+  "Port for opencode REST API. 0 = auto (random free port on each start)": "Port for opencode REST API. 0 = auto (random free port on each start)",
+  "Leader Chords": "Leader Chords",
+  "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m",
+  "Ctrl+A Select All (fix)": "Select all text by Ctrl+A (fix)",
+  "Cancel": "Cancel",
+  "Save": "Save"
 }

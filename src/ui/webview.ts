@@ -43,6 +43,14 @@ new ResizeObserver(() => {
 window.addEventListener("message", (e) => {
   if (e.data.type === "terminalData") term.write(e.data.data as string);
   if (e.data.type === "focusTerminal") term.focus();
+  if (e.data.type === "settingsData") {
+    const d = e.data as { opencodePath: string; serverPort: number; leaderChords: string[]; ctrlASelectAll: boolean };
+    (document.getElementById("setOpenCodePath") as HTMLInputElement).value = d.opencodePath;
+    (document.getElementById("setServerPort") as HTMLInputElement).value = String(d.serverPort);
+    (document.getElementById("setLeaderChords") as HTMLInputElement).value = d.leaderChords.join(",");
+    (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked = d.ctrlASelectAll;
+    document.getElementById("settingsOverlay")!.classList.add("open");
+  }
   if (e.data.type === "serverInfo") {
     const d = e.data as { address: string; port: number; running: boolean };
     const addrEl = document.querySelector(".addr-info")!;
@@ -181,6 +189,36 @@ document.getElementById("restartBtn")!.addEventListener("click", () => {
 
 document.getElementById("toggleBtn")!.addEventListener("click", () => {
   vscode.postMessage({ type: "toggleServer" });
+});
+
+document.getElementById("settingsBtn")!.addEventListener("click", () => {
+  vscode.postMessage({ type: "openSettings" });
+});
+
+document.getElementById("settingsSaveBtn")!.addEventListener("click", () => {
+  const chords = (document.getElementById("setLeaderChords") as HTMLInputElement).value;
+  vscode.postMessage({
+    type: "saveSettings",
+    opencodePath: (document.getElementById("setOpenCodePath") as HTMLInputElement).value,
+    serverPort: parseInt((document.getElementById("setServerPort") as HTMLInputElement).value, 10) || 0,
+    leaderChords: chords.split(",").map((s) => s.trim()).filter(Boolean),
+    ctrlASelectAll: (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked,
+  });
+  document.getElementById("settingsOverlay")!.classList.remove("open");
+});
+
+document.getElementById("settingsCancelBtn")!.addEventListener("click", () => {
+  document.getElementById("settingsOverlay")!.classList.remove("open");
+});
+
+document.getElementById("settingsOverlay")!.addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) document.getElementById("settingsOverlay")!.classList.remove("open");
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.getElementById("settingsOverlay")!.classList.contains("open")) {
+    document.getElementById("settingsOverlay")!.classList.remove("open");
+  }
 });
 
 vscode.postMessage({ type: "ready" });

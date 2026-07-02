@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.0] — 2026-07-02
+
+### Added
+
+- Settings button (gear) in the status bar next to Restart
+- Settings modal with fields for OpenCode Path, Server Port, Leader Chords, Ctrl+A Select All
+- Settings persistence via VS Code configuration API (ConfigurationTarget.Global)
+- Multi-language l10n support for the settings modal (11 locales)
+
 ## [1.2.0] — 2026-07-02
 
 ### Added
