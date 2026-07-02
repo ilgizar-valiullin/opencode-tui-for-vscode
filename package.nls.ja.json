@@ -11,6 +11,7 @@
   "config.title": "VS Code 向け OpenCode TUI",
   "cfg.opencodePath.desc": "opencode へのパス。例：'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe'、'opencode.cmd'、または 'opencode'。",
   "cfg.serverPort.desc": "opencode サーバーのポート。0 = ランダムな空きポート。",
-    "cmd.toggleFocus.title": "OpenCode フォーカス切り替え",
-  "cfg.leaderChords.desc": "インターセプトするリーダーコード文字（例：[\"n\",\"m\",\"l\"]）。空の場合は tui.json またはビルトインのデフォルトを使用。"
+  "cmd.toggleFocus.title": "OpenCode フォーカス切り替え",
+  "cfg.leaderChords.desc": "インターセプトするリーダーコード文字（例：[\"n\",\"m\",\"l\"]）。空の場合は tui.json またはビルトインのデフォルトを使用。",
+  "cfg.ctrlASelectAll.desc": "Ctrl+Aを入力フィールドの全選択にリダイレクトし、ターミナルにカーソルホームを送信しないようにします。"
 }

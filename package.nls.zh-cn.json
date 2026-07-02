@@ -11,6 +11,7 @@
   "config.title": "适用于 VS Code 的 OpenCode TUI",
   "cfg.opencodePath.desc": "opencode 的路径。例如：'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe'、'opencode.cmd' 或直接 'opencode'。",
   "cfg.serverPort.desc": "opencode 服务器的端口。0 = 随机可用端口。",
-    "cmd.toggleFocus.title": "切换 OpenCode 焦点",
-  "cfg.leaderChords.desc": "要拦截的前导和弦字符（例如 [\"n\",\"m\",\"l\"]）。为空则使用 tui.json 或内置默认值。"
+  "cmd.toggleFocus.title": "切换 OpenCode 焦点",
+  "cfg.leaderChords.desc": "要拦截的前导和弦字符（例如 [\"n\",\"m\",\"l\"]）。为空则使用 tui.json 或内置默认值。",
+  "cfg.ctrlASelectAll.desc": "将Ctrl+A重定向为在输入字段中选择全部，而不是向终端发送光标到行首。"
 }
