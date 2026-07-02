@@ -1,66 +1,77 @@
-# Status Bar Interaction Flow
+# Status Bar and Server Architecture Flow
 
-## Sequence Diagram
+## Architecture Overview
+
+```mermaid
+flowchart TB
+    subgraph Extension["Extension Host"]
+        Provider["OpenCodeWebviewProvider"]
+        MCP["MCP Server (shared)"]
+    end
+
+    subgraph Sidebar["Sidebar Webview"]
+        SW["webview.ts"]
+        SSM["OpenCodeServerManager #1"]
+        SPTY["PTY Helper #1"]
+        SOC["opencode --port X"]
+    end
+
+    subgraph Tab["Tab Webview"]
+        TW["webview.ts"]
+        TSM["OpenCodeServerManager #2"]
+        TPTY["PTY Helper #2"]
+        TOC["opencode --port Y"]
+    end
+
+    Provider --> SW
+    Provider --> TW
+    SW --> SSM
+    TW --> TSM
+    SSM --> SPTY
+    TSM --> TPTY
+    SPTY --> SOC
+    TPTY --> TOC
+    MCP -.->|"mcpPort"| SSM
+    MCP -.->|"mcpPort"| TSM
+```
+
+## Server Lifecycle per Webview
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Webview as Webview (webview.ts)
-    participant Ext as Extension Host (webviewProvider.ts)
-    participant SM as ServerManager (opencodeServer.ts)
-    participant Config as VS Code Config
+    participant WV as Webview (sidebar or tab)
+    participant Prov as WebviewProvider
+    participant SM as ServerManager (per-webview)
+    participant PTY as PTY Helper
 
-    Note over Webview,SM: Initial Start
-    Webview->>Ext: { type: "ready" }
-    Ext->>SM: start(openCodePath, port, cwd)
-    SM-->>Ext: ready (port assigned)
-    Ext-->>Webview: { type: "serverInfo", address, port, running: true }
-    Webview->>Webview: Show "Server: localhost:{port}", enable Restart, show "Shutdown"
+    Note over WV,PTY: Each webview creates its own ServerManager
 
-    Note over Webview,SM: Restart
-    User->>Webview: Click "Restart"
-    Webview->>Ext: { type: "restartServer" }
-    Ext->>SM: stop()
-    SM-->>Ext: stopped
-    Ext->>SM: start(...)
-    SM-->>Ext: ready
-    Ext-->>Webview: { type: "serverInfo", address, port, running: true }
-    Webview->>Webview: Update address, enable Restart, show "Shutdown"
+    WV->>Prov: { type: "ready" }
+    Prov->>Prov: Create new OpenCodeServerManager
+    Prov->>SM: setMcpPort(mcpPort)
+    Prov->>SM: start(openCodePath, port, cwd)
+    SM->>PTY: spawn node ptyHelper.js
+    PTY->>PTY: spawn opencode --port X
+    PTY-->>SM: R{pid}
+    SM->>SM: pollHealth() until healthy
+    SM-->>Prov: ready
+    Prov-->>WV: { type: "serverInfo", port, running: true }
 
-    Note over Webview,SM: Shutdown / Start Toggle
-    User->>Webview: Click "Shutdown"
-    Webview->>Ext: { type: "toggleServer" }
-    Ext->>SM: stop()
-    SM-->>Ext: stopped
-    Ext-->>Webview: { type: "serverInfo", address, port: 0, running: false }
-    Webview->>Webview: Show "Server: Stopped", disable Restart, show "Start"
+    Note over WV,PTY: Restart (only affects this webview's server)
+    User->>WV: Click "Restart"
+    WV->>Prov: { type: "restartServer" }
+    Prov->>SM: stop()
+    Prov->>SM: start(...)
+    SM-->>Prov: ready
+    Prov-->>WV: { type: "serverInfo", port, running: true }
 
-    User->>Webview: Click "Start"
-    Webview->>Ext: { type: "toggleServer" }
-    Ext->>SM: start(...)
-    SM-->>Ext: ready
-    Ext-->>Webview: { type: "serverInfo", address, port, running: true }
-    Webview->>Webview: Show "Server: localhost:{port}", enable Restart, show "Shutdown"
-
-    Note over Webview,Config: Settings
-    User->>Webview: Click "Settings (gear)"
-    Webview->>Ext: { type: "openSettings" }
-    Ext->>Config: getConfiguration("opencode-tui-unofficial")
-    Config-->>Ext: settings values
-    Ext-->>Webview: { type: "settingsData", opencodePath, serverPort, leaderChords, ctrlASelectAll }
-    Webview->>Webview: Show settings modal with current values
-
-    User->>Webview: Edit values, click "Save"
-    Webview->>Ext: { type: "saveSettings", ... }
-    Ext->>Config: update() x4 (ConfigurationTarget.Global)
-    Config-->>Ext: saved
-    Webview->>Webview: Close settings modal
-
-    User->>Webview: Click "Cancel" / Escape / click backdrop
-    Webview->>Webview: Close settings modal without saving
+    Note over WV,PTY: Focus tracking
+    WV->>Prov: { type: "focusChange", focused: true }
+    Prov->>Prov: activeServer_ = this server
 ```
 
-## State Diagram
+## State Diagram (per webview)
 
 ```mermaid
 stateDiagram-v2
@@ -85,20 +96,20 @@ stateDiagram-v2
 ## Settings Modal Layout
 
 ```
-┌──────────────────────────────────┐
-│ Settings                         │
-│                                  │
-│ OpenCode Path                    │
-│ [  ____________________________]│
-│                                  │
-│ Server Port (0 = auto)           │
-│ [  ____________________________]│
-│                                  │
-│ Leader Chords (comma separated)  │
-│ [  ____________________________]│
-│                                  │
-│ ☐ Ctrl+A Select All              │
-│                                  │
-│              [Cancel]  [Save]    │
-└──────────────────────────────────┘
++----------------------------------+
+| Settings                         |
+|                                  |
+| OpenCode Path                    |
+| [  ____________________________]|
+|                                  |
+| Server Port (0 = auto)           |
+| [  ____________________________]|
+|                                  |
+| Leader Chords (comma separated)  |
+| [  ____________________________]|
+|                                  |
+| [x] Ctrl+A Select All (fix)      |
+|                                  |
+|              [Cancel]  [Save]    |
++----------------------------------+
 ```

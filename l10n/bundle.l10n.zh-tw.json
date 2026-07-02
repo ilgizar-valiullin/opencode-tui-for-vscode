@@ -11,5 +11,7 @@
   "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "Leader 模式按鍵（Ctrl+X + 字母）。逗號分隔，例如 n,l,c,x,g,m",
   "Ctrl+A Select All (fix)": "Ctrl+A 全選（修正）",
   "Cancel": "取消",
-  "Save": "儲存"
+  "Save": "儲存",
+  "Server": "伺服器",
+  "Input": "輸入"
 }

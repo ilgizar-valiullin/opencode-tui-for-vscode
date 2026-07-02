@@ -11,5 +11,7 @@
   "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "Tasti per la modalità leader (Ctrl+X + lettera). Separati da virgole, es. n,l,c,x,g,m",
   "Ctrl+A Select All (fix)": "Seleziona tutto con Ctrl+A (correzione)",
   "Cancel": "Annulla",
-  "Save": "Salva"
+  "Save": "Salva",
+  "Server": "Server",
+  "Input": "Input"
 }

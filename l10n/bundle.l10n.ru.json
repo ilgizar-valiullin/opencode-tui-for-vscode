@@ -11,5 +11,7 @@
   "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "Клавиши для лидер-режима (Ctrl+X + буква). Через запятую, например n,l,c,x,g,m",
   "Ctrl+A Select All (fix)": "Выделение всего по Ctrl+A (исправление)",
   "Cancel": "Отмена",
-  "Save": "Сохранить"
+  "Save": "Сохранить",
+  "Server": "Сервер",
+  "Input": "Ввод"
 }

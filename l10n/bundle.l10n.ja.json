@@ -11,5 +11,7 @@
   "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "リーダーモードのキー（Ctrl+X + 文字）。カンマ区切り。例: n,l,c,x,g,m",
   "Ctrl+A Select All (fix)": "Ctrl+A で全選択（修正）",
   "Cancel": "キャンセル",
-  "Save": "保存"
+  "Save": "保存",
+  "Server": "サーバー",
+  "Input": "入力"
 }

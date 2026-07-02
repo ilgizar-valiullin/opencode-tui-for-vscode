@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0] — 2026-07-02
+
+### Changed
+
+- Refactor server lifecycle: separate sidebar and tab server instances
+- Remove global `serverManager` singleton — commands use `provider!.stopAllServers()`
+- Attach file/selection commands now require active server context
+- Extension.ts uses `provider!` pattern for command registrations
+
 ## [1.4.0] — 2026-07-02
 
 ### Added

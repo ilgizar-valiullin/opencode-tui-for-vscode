@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { serverManager } from "./opencodeServer";
+import { OpenCodeServerManager } from "./opencodeServer";
 
 function extractLeaderChords(configDir: string, chords: Set<string>): void {
   const tuiPath = path.join(configDir, "tui.json");
@@ -60,12 +60,29 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
   private view_: vscode.WebviewView | null = null;
   private panel_: vscode.WebviewPanel | null = null;
   private extensionUri_: vscode.Uri;
-  private serverStarted_ = false;
+  private sidebarServer_: OpenCodeServerManager | null = null;
+  private tabServer_: OpenCodeServerManager | null = null;
+  private activeServer_: OpenCodeServerManager | null = null;
+  private sidebarServerStarted_ = false;
+  private tabServerStarted_ = false;
   private webviewFocused_ = false;
-  private isTabOpen_ = false;
+  private mcpPort_ = 0;
+  private mcpDisconnectCallback_: (() => void) | null = null;
 
   constructor(extensionUri: vscode.Uri) {
     this.extensionUri_ = extensionUri;
+  }
+
+  setMcpPort(port: number): void { this.mcpPort_ = port; }
+  setMcpDisconnectCallback(cb: () => void): void { this.mcpDisconnectCallback_ = cb; }
+
+  getActiveServer(): OpenCodeServerManager | null {
+    return this.activeServer_ ?? this.sidebarServer_;
+  }
+
+  async stopAllServers(): Promise<void> {
+    await this.sidebarServer_?.stop();
+    await this.tabServer_?.stop();
   }
 
   get viewVisible(): boolean {
@@ -98,7 +115,7 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.html(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg) => {
-      this.handleMessage(webviewView.webview, msg).catch((e) => {
+      this.handleMessage(webviewView.webview, msg, true).catch((e) => {
         console.error("[opencode] handleMessage error:", e?.message ?? e);
       });
     });
@@ -109,39 +126,59 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async handleMessage(webview: vscode.Webview, msg: Record<string, unknown>): Promise<void> {
-    if (msg.type === "ready" && !this.serverStarted_) {
-      this.serverStarted_ = true;
+  private async handleMessage(webview: vscode.Webview, msg: Record<string, unknown>, isSidebar: boolean): Promise<void> {
+    if (msg.type === "ready") {
+      if (isSidebar && this.sidebarServerStarted_) return;
+      if (!isSidebar && this.tabServerStarted_) return;
+
+      if (isSidebar) {
+        this.sidebarServerStarted_ = true;
+        this.sidebarServer_ = new OpenCodeServerManager();
+        if (this.mcpPort_) this.sidebarServer_.setMcpPort(this.mcpPort_);
+        if (this.mcpDisconnectCallback_) this.sidebarServer_.onMcpClientDisconnect(this.mcpDisconnectCallback_);
+      } else {
+        this.tabServerStarted_ = true;
+        this.tabServer_ = new OpenCodeServerManager();
+        if (this.mcpPort_) this.tabServer_.setMcpPort(this.mcpPort_);
+        if (this.mcpDisconnectCallback_) this.tabServer_.onMcpClientDisconnect(this.mcpDisconnectCallback_);
+      }
+
+      const server = isSidebar ? this.sidebarServer_ : this.tabServer_;
       const config = vscode.workspace.getConfiguration("opencode-tui-unofficial");
       const openCodePath = config.get<string>("opencodePath", "opencode");
       try {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        await serverManager.start(openCodePath, undefined, workspaceFolder);
+        await server!.start(openCodePath, undefined, workspaceFolder);
       } catch (err: any) {
-        const msg = err?.message ?? String(err);
-        vscode.window.showErrorMessage(vscode.l10n.t("Failed to start OpenCode: {0}", msg));
+        const errMsg = err?.message ?? String(err);
+        vscode.window.showErrorMessage(vscode.l10n.t("Failed to start OpenCode: {0}", errMsg));
         webview.postMessage({
           type: "terminalData",
-          data: `\r\n\x1b[31m${vscode.l10n.t("Failed to start OpenCode: {0}", msg)}\x1b[0m\r\n`,
+          data: `\r\n\x1b[31m${vscode.l10n.t("Failed to start OpenCode: {0}", errMsg)}\x1b[0m\r\n`,
         });
         return;
       }
-      serverManager.onStdout((data) => {
+      server!.onStdout((data: string) => {
         webview.postMessage({ type: "terminalData", data });
       });
-      webview.postMessage({ type: "serverInfo", address: "localhost", port: serverManager.port, running: true });
+      webview.postMessage({ type: "serverInfo", address: "localhost", port: server!.port, running: true });
+      return;
     }
+
+    const server = isSidebar ? this.sidebarServer_ : this.tabServer_;
+    if (!server) return;
+
     if (msg.type === "restartServer") {
       const config = vscode.workspace.getConfiguration("opencode-tui-unofficial");
       const openCodePath = config.get<string>("opencodePath", "opencode");
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      await serverManager.stop();
+      await server.stop();
       try {
-        await serverManager.start(openCodePath, undefined, workspaceFolder);
-        serverManager.onStdout((data) => {
+        await server.start(openCodePath, undefined, workspaceFolder);
+        server.onStdout((data: string) => {
           webview.postMessage({ type: "terminalData", data });
         });
-        webview.postMessage({ type: "serverInfo", address: "localhost", port: serverManager.port, running: true });
+        webview.postMessage({ type: "serverInfo", address: "localhost", port: server.port, running: true });
       } catch (err: any) {
         const m = err?.message ?? String(err);
         webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
@@ -149,19 +186,19 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       }
     }
     if (msg.type === "toggleServer") {
-      if (serverManager.isRunning()) {
-        await serverManager.stop();
+      if (server.isRunning()) {
+        await server.stop();
         webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
       } else {
         const config = vscode.workspace.getConfiguration("opencode-tui-unofficial");
         const openCodePath = config.get<string>("opencodePath", "opencode");
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         try {
-          await serverManager.start(openCodePath, undefined, workspaceFolder);
-          serverManager.onStdout((data) => {
+          await server.start(openCodePath, undefined, workspaceFolder);
+          server.onStdout((data: string) => {
             webview.postMessage({ type: "terminalData", data });
           });
-          webview.postMessage({ type: "serverInfo", address: "localhost", port: serverManager.port, running: true });
+          webview.postMessage({ type: "serverInfo", address: "localhost", port: server.port, running: true });
         } catch (err: any) {
           const m = err?.message ?? String(err);
           webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
@@ -172,28 +209,31 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
     if (msg.type === "clipboardPaste") {
       try {
         const text = await vscode.env.clipboard.readText();
-        if (text) serverManager.writeToStdin(`\x1b[200~${text}\x1b[201~`);
+        if (text) server.writeToStdin(`\x1b[200~${text}\x1b[201~`);
       } catch (e: any) {
         console.error("[TUI] clipboardPaste ERROR", e?.message ?? e);
       }
     }
     if (msg.type === "resize") {
       const m = msg as { cols: number; rows: number };
-      serverManager.resizePty(m.cols, m.rows);
+      server.resizePty(m.cols, m.rows);
     }
     if (msg.type === "selectAll") {
       try {
-        if (serverManager.client) {
-          await serverManager.client.executeTuiCommand("input_select_all");
+        if (server.client) {
+          await server.client.executeTuiCommand("input_select_all");
         }
       } catch { /* fallback: send super+a CSI u sequence via stdin */ }
-      serverManager.writeToStdin("\x1b[97;9u");
+      server.writeToStdin("\x1b[97;9u");
     }
     if (msg.type === "textInput") {
-      serverManager.writeToStdin(msg.data as string);
+      server.writeToStdin(msg.data as string);
     }
     if (msg.type === "focusChange") {
       this.webviewFocused_ = msg.focused as boolean;
+      if (this.webviewFocused_) {
+        this.activeServer_ = server;
+      }
     }
     if (msg.type === "openSettings") {
       const cfg = vscode.workspace.getConfiguration("opencode-tui-unofficial");
@@ -229,7 +269,7 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
 
     this.panel_.webview.html = this.html(this.panel_.webview);
     this.panel_.webview.onDidReceiveMessage((msg) => {
-      this.handleMessage(this.panel_!.webview, msg).catch((e) => {
+      this.handleMessage(this.panel_!.webview, msg, false).catch((e) => {
         console.error("[opencode] handleMessage error:", e?.message ?? e);
       });
     });
@@ -265,28 +305,51 @@ html,body{height:100%;background:#0d1117;overflow:hidden}
 #statusbar button:hover{background:rgba(255,255,255,0.1)}
 #statusbar button:active{background:rgba(255,255,255,0.2)}
 #statusbar button:disabled{opacity:0.5;cursor:default}
-#settingsOverlay{display:none;position:fixed;top:0;left:0;right:0;bottom:22px;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center}
+#settingsOverlay{display:none;position:fixed;top:0;left:0;right:0;bottom:22px;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center}
 #settingsOverlay.open{display:flex}
-#settingsPanel{background:#1c2333;border:1px solid #30363d;border-radius:6px;padding:20px;width:420px;max-height:80vh;overflow-y:auto;color:#c9d1d9;font-size:13px;font-family:system-ui,-apple-system,sans-serif}
-#settingsPanel h2{margin:0 0 16px;font-size:16px;color:#f0f6fc}
-#settingsPanel .field{margin-bottom:12px}
-#settingsPanel label{display:block;margin-bottom:4px;color:#8b949e;font-size:12px}
-#settingsPanel .desc{color:#6e7681;font-size:11px;margin:2px 0 6px;line-height:1.4}
-#settingsPanel code{color:#8b949e;font-size:inherit}
-#settingsPanel input[type="text"],#settingsPanel input[type="number"]{width:100%;padding:6px 8px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;box-sizing:border-box}
-#settingsPanel input[type="checkbox"]{margin-right:6px}
-#settingsPanel .checkbox-row{display:flex;align-items:center;gap:6px;margin-bottom:12px}
-#settingsPanel .btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
-#settingsPanel .btn-row button{padding:6px 16px;border:1px solid #30363d;border-radius:4px;cursor:pointer;font-size:12px}
+#settingsPanel{background:#0d1117;border:1px solid #30363d;padding:0;width:100%;max-width:448px;max-height:80vh;overflow-y:auto;color:#c9d1d9;font-size:13px;font-family:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;box-sizing:border-box}
+#settingsPanel .settings-header{padding:14px 20px;font-size:14px;font-weight:600;color:#f0f6fc;border-bottom:1px solid #21262d;letter-spacing:0.5px}
+#settingsPanel .section{padding:0 20px}
+#settingsPanel .section-title{padding:16px 0 8px;font-size:11px;font-weight:600;color:#58a6ff;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #21262d;margin:0 0 12px}
+#settingsPanel .section-title:first-of-type{padding-top:16px}
+#settingsPanel .field{margin-bottom:16px}
+#settingsPanel .field label{display:block;margin-bottom:5px;color:#8b949e;font-size:12px;font-weight:400}
+#settingsPanel .field .desc{color:#484f58;font-size:11px;margin-top:5px;line-height:1.45}
+#settingsPanel .field input[type="text"],#settingsPanel .field input[type="number"]{width:100%;padding:7px 10px;background:#161b22;border:1px solid #30363d;color:#c9d1d9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box}
+#settingsPanel .field input[type="text"]:focus,#settingsPanel .field input[type="number"]:focus{border-color:#58a6ff;box-shadow:0 0 0 1px #58a6ff}
+#settingsPanel .field input::placeholder{color:#484f58}
+#settingsPanel .checkbox-field{padding-top:2px}
+#settingsPanel .checkbox-label{display:flex;align-items:center;gap:0;cursor:pointer;color:#c9d1d9;font-size:13px;user-select:none}
+#settingsPanel .checkbox-label input[type="checkbox"]{position:absolute;opacity:0;width:0;height:0}
+#settingsPanel .checkbox-visual{display:inline-flex;align-items:center;justify-content:center;width:32px;height:20px;margin-right:8px;font-size:11px;line-height:1;color:#8b949e;background:#161b22;border:1px solid #30363d;flex-shrink:0}
+#settingsPanel .checkbox-label input:checked+.checkbox-visual{color:#3fb950;border-color:#238636}
+#settingsPanel .checkbox-label input:focus-visible+.checkbox-visual{border-color:#58a6ff;box-shadow:0 0 0 1px #58a6ff}
+#settingsPanel .checkbox-label:hover .checkbox-visual{border-color:#58a6ff}
+#settingsPanel .btn-row{display:flex;gap:8px;justify-content:flex-end;padding:14px 20px 12px;border-top:1px solid #21262d;margin-top:4px}
+#settingsPanel .btn-row button{padding:5px 14px;border:1px solid #30363d;cursor:pointer;font-size:12px;font-family:inherit}
 #settingsPanel .btn-row .btn-primary{background:#238636;color:#fff;border-color:#238636}
 #settingsPanel .btn-row .btn-primary:hover{background:#2ea043}
+#settingsPanel .btn-row .btn-primary:active{background:#196c2c}
 #settingsPanel .btn-row .btn-secondary{background:transparent;color:#c9d1d9}
-#settingsPanel .btn-row .btn-secondary:hover{background:rgba(255,255,255,0.1)}
+#settingsPanel .btn-row .btn-secondary:hover{background:#21262d}
 </style>
 </head><body>
 <div id="terminal"></div>
 <div id="statusbar"><span class="addr-info">Starting...</span><button id="restartBtn">Restart</button><button id="toggleBtn">Shutdown</button><button id="settingsBtn">&#9881;</button></div>
-<div id="settingsOverlay"><div id="settingsPanel"><h2>${vscode.l10n.t("Settings")}</h2><div class="field"><label for="setOpenCodePath">${vscode.l10n.t("OpenCode Path")}</label><div class="desc">${vscode.l10n.t("Path to opencode executable, e.g. 'opencode' or full path to binary")}</div><input type="text" id="setOpenCodePath" /></div><div class="field"><label for="setServerPort">${vscode.l10n.t("Server Port")}</label><div class="desc">${vscode.l10n.t("Port for opencode REST API. 0 = auto (random free port on each start)")}</div><input type="number" id="setServerPort" /></div><div class="field"><label for="setLeaderChords">${vscode.l10n.t("Leader Chords")}</label><div class="desc">${vscode.l10n.t("Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m")}</div><input type="text" id="setLeaderChords" placeholder="n,l,c,x,g,m,..." /></div><div class="checkbox-row"><input type="checkbox" id="setCtrlASelectAll" /><label for="setCtrlASelectAll" style="margin:0">${vscode.l10n.t("Ctrl+A Select All (fix)")}</label></div><div class="btn-row"><button class="btn-secondary" id="settingsCancelBtn">${vscode.l10n.t("Cancel")}</button><button class="btn-primary" id="settingsSaveBtn">${vscode.l10n.t("Save")}</button></div></div></div>
+<div id="settingsOverlay"><div id="settingsPanel">
+<div class="settings-header">${vscode.l10n.t("Settings")}</div>
+<div class="section">
+<div class="section-title">${vscode.l10n.t("Server")}</div>
+<div class="field"><label for="setOpenCodePath">${vscode.l10n.t("OpenCode Path")}</label><input type="text" id="setOpenCodePath" /><div class="desc">${vscode.l10n.t("Path to opencode executable, e.g. 'opencode' or full path to binary")}</div></div>
+<div class="field"><label for="setServerPort">${vscode.l10n.t("Server Port")}</label><input type="number" id="setServerPort" /><div class="desc">${vscode.l10n.t("Port for opencode REST API. 0 = auto (random free port on each start)")}</div></div>
+</div>
+<div class="section">
+<div class="section-title">${vscode.l10n.t("Input")}</div>
+<div class="field"><label for="setLeaderChords">${vscode.l10n.t("Leader Chords")}</label><input type="text" id="setLeaderChords" placeholder="n,l,c,x,g,m,..." /><div class="desc">${vscode.l10n.t("Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m")}</div></div>
+<div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setCtrlASelectAll" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("Ctrl+A Select All (fix)")}</label></div>
+</div>
+<div class="btn-row"><button class="btn-secondary" id="settingsCancelBtn">${vscode.l10n.t("Cancel")}</button><button class="btn-primary" id="settingsSaveBtn">${vscode.l10n.t("Save")}</button></div>
+</div></div>
 <script nonce="${nonce}">var __LEADER_CHORDS__=${JSON.stringify(chords)};var __CTRL_A_SELECT_ALL__=${ctrlASelectAll}</script>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body></html>`;

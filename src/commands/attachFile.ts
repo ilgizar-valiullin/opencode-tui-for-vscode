@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { serverManager } from "../opencodeServer";
+import { OpenCodeServerManager } from "../opencodeServer";
 
 const ENTER_DELAY_MS = 150;
 
@@ -14,18 +14,18 @@ function isBinaryFile(filePath: string): boolean {
   return BINARY_EXTS.has(ext);
 }
 
-async function typeAndSubmit(text: string): Promise<void> {
-  serverManager.writeToStdin(text);
+async function typeAndSubmit(server: OpenCodeServerManager, text: string): Promise<void> {
+  server.writeToStdin(text);
   await new Promise((r) => setTimeout(r, ENTER_DELAY_MS));
-  serverManager.writeToStdin("\r");
+  server.writeToStdin("\r");
 }
 
-async function pasteInPlace(text: string): Promise<void> {
-  serverManager.writeToStdin(`\x1b[200~${text}\x1b[201~\n`);
+async function pasteInPlace(server: OpenCodeServerManager, text: string): Promise<void> {
+  server.writeToStdin(`\x1b[200~${text}\x1b[201~\n`);
 }
 
-async function getRelativePath(filePath: string): Promise<string | null> {
-  const cwd = serverManager.cwd;
+async function getRelativePath(server: OpenCodeServerManager, filePath: string): Promise<string | null> {
+  const cwd = server.cwd;
   if (!cwd) {
     vscode.window.showErrorMessage("Server working directory unknown");
     return null;
@@ -38,23 +38,23 @@ async function getRelativePath(filePath: string): Promise<string | null> {
   return rel;
 }
 
-export async function attachFile(uri: vscode.Uri): Promise<void> {
-  if (!serverManager.isRunning()) {
+export async function attachFile(uri: vscode.Uri, server: OpenCodeServerManager): Promise<void> {
+  if (!server.isRunning()) {
     vscode.window.showErrorMessage("OpenCode server is not running");
     return;
   }
   const absPath = uri.fsPath;
   if (isBinaryFile(absPath)) {
-    await pasteInPlace(absPath);
+    await pasteInPlace(server, absPath);
     return;
   }
-  const rel = await getRelativePath(absPath);
+  const rel = await getRelativePath(server, absPath);
   if (rel === null) return;
-  await typeAndSubmit(`@${rel}`);
+  await typeAndSubmit(server, `@${rel}`);
 }
 
-export async function attachSelection(): Promise<void> {
-  if (!serverManager.isRunning()) {
+export async function attachSelection(server: OpenCodeServerManager): Promise<void> {
+  if (!server.isRunning()) {
     vscode.window.showErrorMessage("OpenCode server is not running");
     return;
   }
@@ -66,11 +66,11 @@ export async function attachSelection(): Promise<void> {
   const document = editor.document;
   const sel = editor.selection;
   const filePath = document.uri.fsPath;
-  const rel = await getRelativePath(filePath);
+  const rel = await getRelativePath(server, filePath);
   if (rel === null) return;
 
   if (sel.isEmpty) {
-    await typeAndSubmit(`@${rel}`);
+    await typeAndSubmit(server, `@${rel}`);
     return;
   }
 
@@ -96,5 +96,5 @@ export async function attachSelection(): Promise<void> {
     "",
   ].join("\n");
 
-  serverManager.writeToStdin(`\x1b[200~${formatted}\x1b[201~`);
+  server.writeToStdin(`\x1b[200~${formatted}\x1b[201~`);
 }

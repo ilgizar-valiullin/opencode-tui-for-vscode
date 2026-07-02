@@ -11,5 +11,7 @@
   "Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m": "리더 모드 키 (Ctrl+X + 문자). 쉼표로 구분, 예: n,l,c,x,g,m",
   "Ctrl+A Select All (fix)": "Ctrl+A로 전체 선택 (수정)",
   "Cancel": "취소",
-  "Save": "저장"
+  "Save": "저장",
+  "Server": "서버",
+  "Input": "입력"
 }

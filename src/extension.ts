@@ -3,7 +3,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import * as os from "os";
-import { serverManager } from "./opencodeServer";
 import { OpenCodeWebviewProvider } from "./webviewProvider";
 import { attachFile, attachSelection } from "./commands/attachFile";
 import { createMcpServer } from "./mcp-server";
@@ -18,6 +17,8 @@ function findDataDir(): string {
   }
   return path.join(os.homedir(), ".local", "share");
 }
+
+let provider: OpenCodeWebviewProvider | null = null;
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log("[opencode] activate start");
@@ -37,7 +38,7 @@ export async function activate(context: vscode.ExtensionContext) {
     for (const h of origUhr) h(reason, Promise.resolve());
   });
 
-  const provider = new OpenCodeWebviewProvider(context.extensionUri);
+  provider = new OpenCodeWebviewProvider(context.extensionUri);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("opencode-tui.view", provider, {
@@ -46,16 +47,17 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("opencode-tui-unofficial.focusView", () => {
       vscode.commands.executeCommand("workbench.view.extension.opencode-tui");
     }),
-    vscode.commands.registerCommand("opencode-tui-unofficial.openTerminal", () => { provider.openInTab().catch(() => {}); }),
-    vscode.commands.registerCommand("opencode-tui-unofficial.openTab", () => { provider.openInTab().catch(() => {}); }),
-    vscode.commands.registerCommand("opencode-tui-unofficial.toggleFocus", () => provider.toggleFocus()),
-    vscode.commands.registerCommand("opencode-tui-unofficial.stopServer", () => { serverManager.stop().catch(() => {}); }),
-    vscode.commands.registerCommand("opencode-tui-unofficial.attachFile", (uri: vscode.Uri) => { attachFile(uri).catch(() => {}); }),
-    vscode.commands.registerCommand("opencode-tui-unofficial.attachFileContext", () => { attachSelection().catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.openTerminal", () => { provider!.openInTab().catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.openTab", () => { provider!.openInTab().catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.toggleFocus", () => provider!.toggleFocus()),
+    vscode.commands.registerCommand("opencode-tui-unofficial.stopServer", () => { provider!.stopAllServers().catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.attachFile", (uri: vscode.Uri) => { const s = provider!.getActiveServer(); if (s) attachFile(uri, s).catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.attachFileContext", () => { const s = provider!.getActiveServer(); if (s) attachSelection(s).catch(() => {}); }),
     vscode.commands.registerCommand("opencode-tui-unofficial.handlePaste", async () => {
       try {
         const text = await vscode.env.clipboard.readText();
-        if (text) serverManager.writeToStdin(`\x1b[200~${text}\x1b[201~`);
+        const s = provider!.getActiveServer();
+        if (text && s) s.writeToStdin(`\x1b[200~${text}\x1b[201~`);
       } catch { /* ignore */ }
     }),
   );
@@ -86,8 +88,8 @@ export async function activate(context: vscode.ExtensionContext) {
     fs.writeFileSync(tmpPath, lockContent, { mode: 0o600 });
     fs.renameSync(tmpPath, lockFilePath);
 
-    serverManager.setMcpPort(mcpHandle.port);
-    serverManager.onMcpClientDisconnect(() => mcpHandle.sessionsClose().catch(() => {}));
+    provider.setMcpPort(mcpHandle.port);
+    provider.setMcpDisconnectCallback(() => mcpHandle.sessionsClose().catch(() => {}));
 
     const EDITOR_NOTIFY_DEBOUNCE_MS = 150;
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -123,5 +125,5 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  serverManager.stop().catch(() => {});
+  provider?.stopAllServers().catch(() => {});
 }

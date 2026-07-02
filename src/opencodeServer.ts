@@ -126,7 +126,7 @@ export class OpenCodeServerManager {
       const pollHealth = () => {
         const base = `http://localhost:${this.port_}`;
         const t0 = Date.now();
-        const timeout = 15000;
+        const timeout = 30000;
         const poll = () => {
           if (settled) return;
           get(`${base}/global/health`, (res) => {
@@ -201,4 +201,4 @@ function findFreePort(): Promise<number> {
   });
 }
 
-export const serverManager = new OpenCodeServerManager();
+
