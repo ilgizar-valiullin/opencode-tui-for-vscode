@@ -22,6 +22,21 @@ function findDataDir(): string {
 export async function activate(context: vscode.ExtensionContext) {
   console.log("[opencode] activate start");
 
+  const origUhr = process.listeners("unhandledRejection");
+  process.removeAllListeners("unhandledRejection");
+  process.on("unhandledRejection", (reason) => {
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    if (
+      msg.includes("fetch failed") ||
+      msg.includes("sendResourceUpdated") ||
+      msg.includes("stream") ||
+      msg.includes("Cannot enqueue")
+    ) {
+      return;
+    }
+    for (const h of origUhr) h(reason, Promise.resolve());
+  });
+
   const provider = new OpenCodeWebviewProvider(context.extensionUri);
 
   context.subscriptions.push(
@@ -31,12 +46,18 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("opencode-tui-unofficial.focusView", () => {
       vscode.commands.executeCommand("workbench.view.extension.opencode-tui");
     }),
-    vscode.commands.registerCommand("opencode-tui-unofficial.openTerminal", () => provider.openInTab()),
-    vscode.commands.registerCommand("opencode-tui-unofficial.openTab", () => provider.openInTab()),
+    vscode.commands.registerCommand("opencode-tui-unofficial.openTerminal", () => { provider.openInTab().catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.openTab", () => { provider.openInTab().catch(() => {}); }),
     vscode.commands.registerCommand("opencode-tui-unofficial.toggleFocus", () => provider.toggleFocus()),
-    vscode.commands.registerCommand("opencode-tui-unofficial.stopServer", () => serverManager.stop()),
-    vscode.commands.registerCommand("opencode-tui-unofficial.attachFile", (uri: vscode.Uri) => attachFile(uri)),
-    vscode.commands.registerCommand("opencode-tui-unofficial.attachFileContext", () => attachSelection()),
+    vscode.commands.registerCommand("opencode-tui-unofficial.stopServer", () => { serverManager.stop().catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.attachFile", (uri: vscode.Uri) => { attachFile(uri).catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.attachFileContext", () => { attachSelection().catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.handlePaste", async () => {
+      try {
+        const text = await vscode.env.clipboard.readText();
+        if (text) serverManager.writeToStdin(`\x1b[200~${text}\x1b[201~`);
+      } catch { /* ignore */ }
+    }),
   );
 
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -66,6 +87,7 @@ export async function activate(context: vscode.ExtensionContext) {
     fs.renameSync(tmpPath, lockFilePath);
 
     serverManager.setMcpPort(mcpHandle.port);
+    serverManager.onMcpClientDisconnect(() => mcpHandle.sessionsClose().catch(() => {}));
 
     const EDITOR_NOTIFY_DEBOUNCE_MS = 150;
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;

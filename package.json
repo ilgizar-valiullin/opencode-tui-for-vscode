@@ -2,7 +2,7 @@
   "name": "opencode-tui-for-vscode",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "publisher": "opencode-tui-unofficial",
   "license": "MIT",
   "repository": {
@@ -132,6 +132,11 @@
           },
           "default": [],
           "description": "%cfg.leaderChords.desc%"
+        },
+        "opencode-tui-unofficial.ctrlASelectAll": {
+          "type": "boolean",
+          "default": true,
+          "description": "%cfg.ctrlASelectAll.desc%"
         }
       }
     }

@@ -4,6 +4,7 @@ import "@xterm/xterm/css/xterm.css";
 
 declare const acquireVsCodeApi: () => { postMessage(msg: unknown): void };
 declare const __LEADER_CHORDS__: string[] | undefined;
+declare const __CTRL_A_SELECT_ALL__: boolean | undefined;
 
 const vscode = acquireVsCodeApi();
 
@@ -24,8 +25,14 @@ const term = new Terminal({
 const fitAddon = new FitAddon();
 term.loadAddon(fitAddon);
 
+let startedOnce = false;
+
 const el = document.getElementById("terminal")!;
 term.open(el);
+term.attachCustomKeyEventHandler((e) => {
+  if (e.type === "keydown" && e.ctrlKey && e.code === "KeyA" && __CTRL_A_SELECT_ALL__) return false;
+  return true;
+});
 fitAddon.fit();
 
 new ResizeObserver(() => {
@@ -36,6 +43,34 @@ new ResizeObserver(() => {
 window.addEventListener("message", (e) => {
   if (e.data.type === "terminalData") term.write(e.data.data as string);
   if (e.data.type === "focusTerminal") term.focus();
+  if (e.data.type === "serverInfo") {
+    const d = e.data as { address: string; port: number; running: boolean };
+    const addrEl = document.querySelector(".addr-info")!;
+    const restartBtn = document.getElementById("restartBtn") as HTMLButtonElement;
+    const toggleBtn = document.getElementById("toggleBtn") as HTMLButtonElement;
+    if (d.running) {
+      addrEl.textContent = `Server: ${d.address}:${d.port}`;
+      restartBtn.disabled = false;
+      restartBtn.textContent = "Restart";
+      toggleBtn.disabled = false;
+      toggleBtn.textContent = "Shutdown";
+      if (startedOnce) {
+        term.clear();
+        term.write(`\r\n\x1b[33m[Server restarted on ${d.address}:${d.port}]\x1b[0m\r\n`);
+        term.focus();
+        fitAddon.fit();
+        vscode.postMessage({ type: "resize", cols: term.cols, rows: term.rows });
+      }
+      startedOnce = true;
+    } else {
+      addrEl.textContent = "Server: Stopped";
+      restartBtn.disabled = true;
+      restartBtn.textContent = "Restart";
+      toggleBtn.disabled = false;
+      toggleBtn.textContent = "Start";
+      term.write(`\r\n\x1b[33m[Server stopped]\x1b[0m\r\n`);
+    }
+  }
 });
 
 const LEADER_TIMEOUT = 2000;
@@ -96,10 +131,17 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
 }, true);
 
 term.onData((data: string) => {
+  if (data === "\x01" && __CTRL_A_SELECT_ALL__) {
+    vscode.postMessage({ type: "selectAll" });
+    return;
+  }
   if (data === "\x18") {
     leaderActive = true;
     if (leaderTimer !== null) clearTimeout(leaderTimer);
     leaderTimer = setTimeout(clearLeader, LEADER_TIMEOUT);
+  }
+  if (data === "\x16") {
+    vscode.postMessage({ type: "clipboardPaste" });
   }
   vscode.postMessage({ type: "textInput", data });
 });
@@ -110,9 +152,35 @@ el.addEventListener("focusin", () => vscode.postMessage({ type: "focusChange", f
 el.addEventListener("focusout", () => vscode.postMessage({ type: "focusChange", focused: false }));
 
 document.addEventListener("keydown", (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && e.code === "KeyA" && __CTRL_A_SELECT_ALL__) {
+    e.preventDefault();
+    e.stopPropagation();
+    vscode.postMessage({ type: "selectAll" });
+    return;
+  }
   if (e.key === "Escape" && el.contains(document.activeElement)) {
     vscode.postMessage({ type: "focusChange", focused: false });
   }
 }, true);
+
+document.addEventListener("paste", (e: ClipboardEvent) => {
+  const text = e.clipboardData?.getData("text/plain");
+  if (text) {
+    e.preventDefault();
+    e.stopPropagation();
+    vscode.postMessage({ type: "textInput", data: `\x1b[200~${text}\x1b[201~` });
+    return;
+  }
+  e.stopPropagation();
+  vscode.postMessage({ type: "clipboardPaste" });
+}, true);
+
+document.getElementById("restartBtn")!.addEventListener("click", () => {
+  vscode.postMessage({ type: "restartServer" });
+});
+
+document.getElementById("toggleBtn")!.addEventListener("click", () => {
+  vscode.postMessage({ type: "toggleServer" });
+});
 
 vscode.postMessage({ type: "ready" });

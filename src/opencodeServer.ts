@@ -18,6 +18,7 @@ export class OpenCodeServerManager {
   private mcpPort_: number = 0;
   private stdoutCallback_: ((data: string) => void) | null = null;
   private stdoutBuffer_: string[] = [];
+  private mcpDisconnectCallback_: (() => void) | null = null;
 
   get mcpPort(): number { return this.mcpPort_; }
   setMcpPort(port: number): void { this.mcpPort_ = port; }
@@ -25,6 +26,10 @@ export class OpenCodeServerManager {
   get client(): OpenCodeClient | null { return this.client_; }
   get port(): number { return this.port_; }
   get cwd(): string { return this.cwd_; }
+
+  onMcpClientDisconnect(cb: () => void): void {
+    this.mcpDisconnectCallback_ = cb;
+  }
 
   onStdout(cb: (data: string) => void): void {
     this.stdoutCallback_ = cb;
@@ -62,14 +67,18 @@ export class OpenCodeServerManager {
         else { log(`Ready on port ${this.port_}`); resolve(); }
       };
 
-      this.helper_ = spawn(nodeExe, [helperPath], {
+      const proc = spawn(nodeExe, [helperPath], {
         stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: { ...process.env },
       });
+      this.helper_ = proc;
 
-      this.helper_.on("error", (e) => done(new Error(`Helper: ${e.message}`)));
-      this.helper_.on("exit", (code) => {
+      proc.on("error", (e) => done(new Error(`Helper: ${e.message}`)));
+      proc.on("exit", (code) => {
         if (!settled) done(new Error(`Helper exited code=${code}`));
-        this.helper_ = null; this.client_ = null;
+        if (this.helper_ === proc) {
+          this.helper_ = null; this.client_ = null;
+          this.mcpDisconnectCallback_?.();
+        }
       });
 
       this.helper_.stderr?.on("data", (c: Buffer) => {
@@ -103,6 +112,7 @@ export class OpenCodeServerManager {
             try { code = JSON.parse(payload).code; } catch { /* */ }
             if (!settled) done(new Error(`PTY code=${code}`));
             this.helper_ = null; this.client_ = null;
+            this.mcpDisconnectCallback_?.();
           }
         }
       });
@@ -147,6 +157,7 @@ export class OpenCodeServerManager {
       this.helper_.kill(); this.helper_ = null;
     }
     this.client_ = null; this.port_ = 0;
+    this.mcpDisconnectCallback_?.();
   }
 
   isRunning(): boolean { return this.helper_ !== null && this.helper_.exitCode === null; }

@@ -97,7 +97,11 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri_, 'dist')],
     };
     webviewView.webview.html = this.html(webviewView.webview);
-    webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(webviewView.webview, msg));
+    webviewView.webview.onDidReceiveMessage((msg) => {
+      this.handleMessage(webviewView.webview, msg).catch((e) => {
+        console.error("[opencode] handleMessage error:", e?.message ?? e);
+      });
+    });
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible && webviewView.webview) {
         webviewView.webview.postMessage({ type: "resize" });
@@ -125,10 +129,65 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       serverManager.onStdout((data) => {
         webview.postMessage({ type: "terminalData", data });
       });
+      webview.postMessage({ type: "serverInfo", address: "localhost", port: serverManager.port, running: true });
+    }
+    if (msg.type === "restartServer") {
+      const config = vscode.workspace.getConfiguration("opencode-tui-unofficial");
+      const openCodePath = config.get<string>("opencodePath", "opencode");
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      await serverManager.stop();
+      try {
+        await serverManager.start(openCodePath, undefined, workspaceFolder);
+        serverManager.onStdout((data) => {
+          webview.postMessage({ type: "terminalData", data });
+        });
+        webview.postMessage({ type: "serverInfo", address: "localhost", port: serverManager.port, running: true });
+      } catch (err: any) {
+        const m = err?.message ?? String(err);
+        webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
+        vscode.window.showErrorMessage(vscode.l10n.t("Failed to restart: {0}", m));
+      }
+    }
+    if (msg.type === "toggleServer") {
+      if (serverManager.isRunning()) {
+        await serverManager.stop();
+        webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
+      } else {
+        const config = vscode.workspace.getConfiguration("opencode-tui-unofficial");
+        const openCodePath = config.get<string>("opencodePath", "opencode");
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        try {
+          await serverManager.start(openCodePath, undefined, workspaceFolder);
+          serverManager.onStdout((data) => {
+            webview.postMessage({ type: "terminalData", data });
+          });
+          webview.postMessage({ type: "serverInfo", address: "localhost", port: serverManager.port, running: true });
+        } catch (err: any) {
+          const m = err?.message ?? String(err);
+          webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
+          vscode.window.showErrorMessage(vscode.l10n.t("Failed to start: {0}", m));
+        }
+      }
+    }
+    if (msg.type === "clipboardPaste") {
+      try {
+        const text = await vscode.env.clipboard.readText();
+        if (text) serverManager.writeToStdin(`\x1b[200~${text}\x1b[201~`);
+      } catch (e: any) {
+        console.error("[TUI] clipboardPaste ERROR", e?.message ?? e);
+      }
     }
     if (msg.type === "resize") {
       const m = msg as { cols: number; rows: number };
       serverManager.resizePty(m.cols, m.rows);
+    }
+    if (msg.type === "selectAll") {
+      try {
+        if (serverManager.client) {
+          await serverManager.client.executeTuiCommand("input_select_all");
+        }
+      } catch { /* fallback: send super+a CSI u sequence via stdin */ }
+      serverManager.writeToStdin("\x1b[97;9u");
     }
     if (msg.type === "textInput") {
       serverManager.writeToStdin(msg.data as string);
@@ -142,12 +201,20 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
     if (this.panel_) { this.panel_.reveal(); return; }
 
     this.panel_ = vscode.window.createWebviewPanel(
-      "opencode-tui-tab", "OpenCode TUI", vscode.ViewColumn.Beside,
-      { enableScripts: true, retainContextWhenHidden: true },
+      "opencode-tui-tab", "OpenCode TUI", vscode.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.joinPath(this.extensionUri_, 'dist')],
+      },
     );
 
     this.panel_.webview.html = this.html(this.panel_.webview);
-    this.panel_.webview.onDidReceiveMessage((msg) => this.handleMessage(this.panel_!.webview, msg));
+    this.panel_.webview.onDidReceiveMessage((msg) => {
+      this.handleMessage(this.panel_!.webview, msg).catch((e) => {
+        console.error("[opencode] handleMessage error:", e?.message ?? e);
+      });
+    });
     this.panel_.onDidDispose(() => { this.panel_ = null; });
   }
 
@@ -160,6 +227,8 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
     );
     const nonce = getNonce();
     const chords = readLeaderChords();
+    const config = vscode.workspace.getConfiguration("opencode-tui-unofficial");
+    const ctrlASelectAll = config.get<boolean>("ctrlASelectAll", true);
 
     return `<!DOCTYPE html>
 <html><head>
@@ -171,11 +240,18 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:#0d1117;overflow:hidden}
-#terminal{height:100%;width:100%}
+#terminal{height:calc(100% - 22px);width:100%}
+#statusbar{position:fixed;bottom:0;left:0;right:0;height:22px;background:#4a80c8;color:#fff;display:flex;align-items:center;padding:0 8px;font-size:12px;z-index:100;gap:6px}
+#statusbar .addr-info{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#statusbar button{background:transparent;border:1px solid rgba(255,255,255,0.3);color:#fff;padding:0 8px;cursor:pointer;font-size:11px;line-height:18px;border-radius:2px}
+#statusbar button:hover{background:rgba(255,255,255,0.1)}
+#statusbar button:active{background:rgba(255,255,255,0.2)}
+#statusbar button:disabled{opacity:0.5;cursor:default}
 </style>
 </head><body>
 <div id="terminal"></div>
-<script nonce="${nonce}">var __LEADER_CHORDS__=${JSON.stringify(chords)}</script>
+<div id="statusbar"><span class="addr-info">Starting...</span><button id="restartBtn">Restart</button><button id="toggleBtn">Shutdown</button></div>
+<script nonce="${nonce}">var __LEADER_CHORDS__=${JSON.stringify(chords)};var __CTRL_A_SELECT_ALL__=${ctrlASelectAll}</script>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body></html>`;
   }
