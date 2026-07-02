@@ -2,6 +2,7 @@
 
 ## ADR-001: Use `event.code` over `event.key` for keyboard handling
 
+**Status**: Active
 **Date**: 2025-03 (project inception)
 
 **Context**: VS Code's built-in terminal uses `event.key` to detect keyboard input. On Cyrillic, Korean, Japanese, and other non-Latin layouts, `event.key` returns localized characters (e.g., `ч` instead of `x`, `ь` instead of `m`), making every keyboard shortcut layout-dependent and broken for non-Latin users.
@@ -22,6 +23,7 @@
 
 ## ADR-002: Two-process architecture (extension host + PTY helper)
 
+**Status**: Active
 **Date**: 2025-03 (project inception)
 
 **Context**: VS Code extensions run in Electron's Node.js runtime. `node-pty` is a native C++ module compiled against a specific Node.js ABI. Electron uses a custom Node.js ABI that differs from system Node.js. Loading `node-pty` compiled for system Node.js into Electron's runtime causes `ERR_DLOPEN_FAILED`.
@@ -45,6 +47,7 @@
 
 ## ADR-003: Use system Node.js, not Electron's `process.execPath`, for PTY helper
 
+**Status**: Active
 **Date**: 2026-07 (v1.1.1)
 
 **Context**: Originally, `findNode()` checked only Windows `Program Files` paths, then fell back to `process.execPath` (Electron's Node.js). On Linux/macOS, it always used Electron. This meant `node-pty` loaded under Electron ABI, which often failed or produced undefined behavior.
@@ -61,6 +64,7 @@
 
 ## ADR-004: HTTP API for hotkey commands, bypassing terminal input
 
+**Status**: Active
 **Date**: 2025-03 (project inception)
 
 **Context**: OpenCode processes keyboard input through its TUI. Leader chord commands could be sent as keystrokes through the PTY, but this is fragile: timing issues, race conditions with terminal state, and the terminal might be in insert mode or processing a different command.
@@ -77,6 +81,7 @@
 
 ## ADR-005: xterm.js for rendering only, not input processing
 
+**Status**: Active
 **Date**: 2025-03 (project inception)
 
 **Context**: xterm.js can handle both rendering and input. However, its input processing uses the deprecated `keypress` event and has inconsistent behavior across platforms, especially with non-ASCII input.
@@ -91,24 +96,32 @@
 
 ---
 
-## ADR-006: Singleton server manager per VS Code window
+## ADR-006: Per-webview server instances (replaces singleton)
 
-**Date**: 2025-03 (project inception)
+**Status**: Active (supersedes original singleton approach as of v1.5.0)
+**Date**: 2026-07-02 (v1.5.0)
 
-**Context**: Users can open OpenCode in both the sidebar view and as a tab. Each instance could theoretically start its own opencode process, wasting resources.
+**Context**: Users can open OpenCode in both the sidebar view and as a tab. Initially, a singleton `serverManager` was shared across all views. This meant both views showed identical terminal output and stopping the server affected both. The singleton was exported as a module-level variable, creating tight coupling.
 
-**Decision**: Use a singleton `serverManager` (module-level export) shared across all view instances. The sidebar and tab use the same opencode process.
+**Decision**: Each webview (sidebar or tab) gets its own `OpenCodeServerManager` instance, stored in `webviewProvider` as `sidebarServer_` and `tabServer_`. The `activeServer_` pointer tracks which view most recently had focus. Commands use `provider!.getActiveServer()` to target the correct instance.
 
 **Consequences**:
-- One opencode process per VS Code window
-- Both views show exactly the same terminal output
-- Stopping the server stops it for all views
-- `isRunning()` check prevents double-start
+- Each view has its own opencode process and port
+- Restarting one view doesn't affect the other
+- Commands (attach file, paste) target the focused view
+- Slightly more resource usage (two opencode processes)
+- Cleaner lifecycle: commands reference the provider, not a module-level singleton
+
+**Migration from singleton**:
+- Previously: `serverManager` was a module-level export in `opencodeServer.ts`
+- Now: `webviewProvider` creates `new OpenCodeServerManager()` per view
+- Commands check `provider!.getActiveServer()` before operating
 
 ---
 
 ## ADR-007: Embed MCP server for IDE context awareness
 
+**Status**: Active
 **Date**: 2025-03 (project inception)
 
 **Context**: OpenCode needs to know about the current editor state (active file, selection) to provide context-aware code assistance. Polling the editor state from OpenCode would be inefficient and fragile.
@@ -126,6 +139,7 @@
 
 ## ADR-008: Leader key via raw byte detection in PTY output
 
+**Status**: Active
 **Date**: 2025-03 (project inception)
 
 **Context**: When the user presses `Ctrl+X` in the terminal, opencode sends this through the PTY output as the raw byte `\x18`. The extension needs to detect this to activate leader mode.
@@ -142,6 +156,7 @@
 
 ## ADR-009: Localization via `package.nls` + `vscode.l10n`
 
+**Status**: Active
 **Date**: 2026-07 (v1.1.1)
 
 **Context**: The extension is used by non-English speakers. Command titles, config descriptions, and error messages need translation.
@@ -153,13 +168,14 @@
 **Consequences**:
 - No third-party i18n library needed
 - VS Code handles locale detection and file resolution automatically
-- 10 languages shipped initially
+- 10 languages shipped initially; settings modal strings also localized
 - Missing translations fall back to English silently
 
 ---
 
 ## ADR-010: [`useConptyDll: true`](https://github.com/microsoft/node-pty) on Windows
 
+**Status**: Active
 **Date**: 2025-03 (project inception)
 
 **Context**: On Windows, `node-pty` can use either the legacy Win32 PTY API or the modern ConPTY API (Windows 10 1809+). The legacy API has issues with modern terminal applications (rendering, resize behavior, unicode).
@@ -171,3 +187,86 @@
 - Proper resize handling with ConPTY
 - No cursor inheritance (prevents cursor position issues)
 - No platform detection needed — flags are no-ops on Linux/macOS
+
+---
+
+## ADR-011: Settings modal as webview overlay
+
+**Status**: Active
+**Date**: 2026-07-02 (v1.4.0)
+
+**Context**: Users need to configure the opencode path, server port, leader chords, and Ctrl+A behavior without editing VS Code settings JSON directly or using a separate settings page. VS Code's native settings UI is adequate but hard to discover.
+
+**Decision**: Implement a settings modal as an HTML overlay inside the webview itself, styled to match GitHub Dark theme (#0d1117 background, #58a6ff accents). Settings are persisted via `vscode.workspace.getConfiguration().update()` with `ConfigurationTarget.Global`.
+
+**Consequences**:
+- Settings are accessible via a gear button in the status bar
+- No native VS Code UI overhead; all styling is inline CSS in the webview HTML
+- Settings persist across VS Code restarts
+- Modal can be closed via Cancel, Escape key, or backdrop click
+- All setting labels are localized via `vscode.l10n.t()`
+
+**Fields in settings modal**:
+- **OpenCode Path** — path to opencode binary (string)
+- **Server Port** — port for REST API (0 = auto) (integer)
+- **Leader Chords** — leader mode chord keys, comma-separated (string[])
+- **Ctrl+A Select All (fix)** — checkbox to enable/disable Ctrl+A interception for select-all behavior
+
+---
+
+## ADR-012: Ctrl+A select all interception
+
+**Status**: Active
+**Date**: 2026-07-02 (v1.4.0)
+
+**Context**: In a terminal emulator, Ctrl+A normally sends `\x01` (SOH) to the PTY. In many terminal applications, this is mapped to "beginning of line" or "select all" depending on context. Users expected Ctrl+A in the OpenCode terminal to function as a TUI command (select all input text) rather than sending raw `\x01`. Additionally, VS Code's webview intercepts Ctrl+A natively for select-all, creating a conflict.
+
+**Decision**: Intercept Ctrl+A at three levels:
+1. `xterm.attachCustomKeyEventHandler` — prevents xterm from processing Ctrl+A
+2. `document keydown` capture phase — prevents the browser's default select-all
+3. `term.onData` — intercepts `\x01` byte and sends `{ type: "selectAll" }` instead
+
+The `selectAll` message triggers `OpenCodeClient.executeTuiCommand("input_select_all")` via HTTP, with a fallback to sending `\x1b[97;9u` (CSI u sequence) via stdin if HTTP fails.
+
+**Consequences**:
+- Ctrl+A triggers "select all" in the TUI input, not raw byte
+- Configurable via `opencode-tui-unofficial.ctrlASelectAll` setting (default: true)
+- When disabled, Ctrl+A sends `\x01` through the PTY as normal
+- The `__CTRL_A_SELECT_ALL__` JS variable is injected into the webview HTML at construction time
+
+---
+
+## ADR-013: Paste via bracketed paste mode
+
+**Status**: Active
+**Date**: 2026-07-02 (v1.3.0)
+
+**Context**: Pasting text into a terminal sends each character as if typed, which can trigger unintended behavior (e.g., pasting multi-line text into a shell executes commands immediately). Proper terminal applications use bracketed paste mode (`\x1b[200~...\x1b[201~`) to indicate paste boundaries.
+
+**Decision**: All pastes are wrapped in bracketed paste sequences:
+- Native paste events (`Ctrl+V` or right-click paste): intercept via `document paste` event, read clipboard data, wrap in `\x1b[200~...\x1b[201~`
+- Term.onData `\x16` (Ctrl+V raw byte): send `{ type: "clipboardPaste" }` to extension host, which reads clipboard via `vscode.env.clipboard.readText()` and writes bracketed paste to PTY
+
+**Consequences**:
+- Applications that support bracketed paste display pasted text differently (e.g., no auto-indent)
+- Multi-line pastes don't execute immediately in bash/zsh
+- `handlePaste` command registered as `opencode-tui-unofficial.handlePaste` for programmatic use
+- Clipboard read permission may trigger a VS Code permission prompt on first use
+
+---
+
+## ADR-014: Separate sidebar and tab server instances
+
+**Status**: Active
+**Date**: 2026-07-02 (v1.5.0)
+
+**Context**: The sidebar and tab views share the same icon and serve the same purpose. Users who open both expect independent terminals (different working directories, different sessions). The original singleton design forced both views into the same terminal.
+
+**Decision**: The `webviewProvider` tracks two `OpenCodeServerManager` instances: `sidebarServer_` and `tabServer_`. A `sidebarServerStarted_` / `tabServerStarted_` flag prevents double-start per view. `activeServer_` is set on focus and used by attach/command operations.
+
+**Consequences**:
+- Each view type gets its own opencode process
+- Commands that need a server context check `getActiveServer()`
+- `stopAllServers()` iterates both instances
+- MCP `mcpPort` is shared between instances (both connect to the same MCP server)
+- Focus tracking determines which server receives attach/paste commands

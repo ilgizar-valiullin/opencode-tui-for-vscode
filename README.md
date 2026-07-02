@@ -8,11 +8,12 @@ Embed [OpenCode](https://opencode.ai) TUI directly in VS Code as a webview panel
 
 ## Features
 
-- **Full TUI in VS Code** — OpenCode terminal as a sidebar view or tab
+- **Full TUI in VS Code** — OpenCode terminal as a sidebar view or tab, each with its own server instance
 - **Toggle focus** — `Ctrl+Shift+'` switches between the editor and OpenCode panel (customizable in VS Code keybindings)
 - **Leader key support** — Ctrl+X (physical Ctrl position) activates leader mode regardless of layout
 - **Attach files** — Right-click files or selections in VS Code to attach them to OpenCode context
 - **IDE context awareness** — MCP server exposes current editor state to OpenCode
+- **Settings modal** — On-screen settings panel in the terminal (gear button in status bar)
 - **Localized** — UI translated to 10 languages (see [Localization](docs/localization.md))
 - **Future-proof** — designed to support future OpenCode versions as long as possible; minimal coupling to internal OpenCode APIs
 
@@ -67,6 +68,9 @@ Then press `F5` in VS Code to launch the Extension Development Host.
 | `opencode-tui-unofficial.opencodePath` | `"opencode"` | Path to the OpenCode CLI executable |
 | `opencode-tui-unofficial.serverPort` | `0` | Port for OpenCode server (`0` = random free port) |
 | `opencode-tui-unofficial.leaderChords` | `[]` | Leader chord characters to intercept (empty = read from `tui.json` or built-in defaults) |
+| `opencode-tui-unofficial.ctrlASelectAll` | `true` | Intercept Ctrl+A in the terminal for "select all" instead of sending raw `\x01` |
+
+Settings can also be changed via the in-terminal settings modal (gear button in status bar).
 
 ## Usage
 
@@ -74,6 +78,7 @@ Then press `F5` in VS Code to launch the Extension Development Host.
 - `Ctrl+Shift+P` → **OpenCode: Open Terminal**
 - Right-click a file in the explorer → **Attach to OpenCode**
 - Select text in an editor → right-click → **Attach to OpenCode**
+- Click the gear icon (⚙) in the terminal status bar to open settings
 
 ### Keyboard handling
 
@@ -92,6 +97,8 @@ npm install
 npm run build       # Build extension + webview
 npm run watch       # Watch mode
 npx tsc --noEmit    # Type check
+npm run lint        # Lint
+npm test            # Smoke tests
 npx vsce package    # Build + package VSIX
 ```
 
@@ -99,19 +106,19 @@ npx vsce package    # Build + package VSIX
 
 ```
 ├── src/
-│   ├── extension.ts              # Entry point, activation
+│   ├── extension.ts              # Entry point, activation, MCP lifecycle
 │   ├── types.ts                  # TUI command IDs and shared types
 │   ├── opencodeServer.ts         # OpenCode process lifecycle + PTY helper
-│   ├── ptyHelper.ts              # node-pty process for terminal emulation
+│   ├── ptyHelper.js              # node-pty process for terminal emulation
 │   ├── httpClient.ts             # Typed REST client for OpenCode API
-│   ├── webviewProvider.ts        # Webview panel with xterm.js
+│   ├── webviewProvider.ts        # Webview panel with xterm.js + settings modal
 │   ├── mcp-server.ts             # MCP server for IDE context
 │   ├── vscode-editor-state.ts    # Current editor state provider
 │   ├── commands/
 │   │   └── attachFile.ts         # Attach file/selection commands
 │   └── ui/
 │       └── webview.ts            # Frontend: terminal + keyboard interceptor
-├── l10n/                         # Localization bundles (10 languages)
+├── l10n/                         # Localization bundles (11 locales)
 ├── package.nls.json              # English source for package.json strings
 ├── package.nls.*.json            # Translations (10 languages)
 ├── esbuild.mjs                   # Build script (extension + webview + helper)
@@ -124,11 +131,9 @@ npx vsce package    # Build + package VSIX
 2. Register it in `extension.ts` via the command system
 3. Add the keyboard binding in `package.json`
 
-See [Development Guide](docs/development.md) for more details.
-
 ## Localization (By AI)
 
-The extension supports 10 languages. To add a new translation, see [Localization Guide](docs/localization.md).
+The extension supports 11 languages. To add a new translation, see [Localization Guide](docs/localization.md).
 
 Available languages:
 - English (en)

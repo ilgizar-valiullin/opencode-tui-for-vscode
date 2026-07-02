@@ -86,13 +86,58 @@ function codeToAscii(code: string, shift: boolean): string | null {
 }
 ```
 
-## Customizing leader chords
+## Ctrl+A Select All
 
-Leader chord characters can be configured via the `opencode-tui-unofficial.leaderChords` setting in VS Code settings. If empty, the extension reads from `tui.json` in OpenCode's config directory, falling back to the full default set:
+`Ctrl+A` is intercepted at three levels to provide "select all" behavior instead of sending raw `\x01`:
+
+1. **`xterm.attachCustomKeyEventHandler`** — prevents xterm from capturing Ctrl+A
+2. **`document keydown`** (capture phase) — prevents browser default select-all
+3. **`term.onData`** — detects `\x01` byte and sends `selectAll` message
+
+The `selectAll` message triggers `OpenCodeClient.executeTuiCommand("input_select_all")` via HTTP API, with a fallback to `\x1b[97;9u` (CSI u sequence) via stdin.
+
+Configurable via `opencode-tui-unofficial.ctrlASelectAll` setting (default: true). When disabled, `\x01` passes through to the terminal normally.
 
 ```
-n, l, c, x, g, m, a, e, t, s, b, h, y, u, r, q
+Ctrl+A pressed
+       │
+       ▼
+xterm.attachCustomKeyEventHandler returns false
+       │
+       ▼
+term.onData receives "\x01"
+       │
+       ├─ ctrlASelectAll = true  → postMessage({ type: "selectAll" })
+       └─ ctrlASelectAll = false → postMessage({ type: "textInput", data: "\x01" })
 ```
+
+## Paste handling (Ctrl+V)
+
+All pastes use **bracketed paste mode** (`\x1b[200~...\x1b[201~`) for proper terminal handling:
+
+- **Native paste event** (`Ctrl+V` or context menu paste): intercepted by `document paste` event listener, text wrapped in bracketed paste sequences
+- **Ctrl+V raw byte** (`\x16` in term.onData): posts `clipboardPaste` message, extension host reads clipboard and writes bracketed paste to PTY
+- **Fallback**: if clipboard text is available, it's sent directly; otherwise clipboard API is used
+
+```
+Ctrl+V pressed
+       │
+       ▼
+document paste event fires
+       │
+       ├─ Text available → "\x1b[200~{text}\x1b[201~" via textInput
+       └─ No text → clipboardPaste message → vscode.env.clipboard.readText()
+```
+
+## Escape handling
+
+The `Escape` key has two behaviors depending on context:
+
+- **Settings modal open**: closes the settings overlay
+- **Leader mode active**: clears leader mode
+- **Neither**: posts `focusChange: false`, returning focus to the editor
+
+These are checked in order of priority.
 
 ## Focus toggle
 
@@ -105,6 +150,16 @@ n, l, c, x, g, m, a, e, t, s, b, h, y, u, r, q
 This keybinding can be customized in VS Code's Keyboard Shortcuts editor (`Ctrl+K Ctrl+S`). Search for "Toggle OpenCode Focus".
 
 The webview reports its focus state to the extension host via `focusChange` messages. The `Escape` key in the webview also triggers a focus loss, returning control to the editor.
+
+## Customizing leader chords
+
+Leader chord characters can be configured via the `opencode-tui-unofficial.leaderChords` setting in VS Code settings. If empty, the extension reads from `tui.json` in OpenCode's config directory, falling back to the full default set:
+
+```
+n, l, c, x, g, m, a, e, t, s, b, h, y, u, r, q
+```
+
+The `readLeaderChords()` function in `webviewProvider.ts` searches multiple config directories (Windows APPDATA, XDG, HOME, USERPROFILE) for `tui.json` and extracts `<leader>key` patterns. Results are injected into the webview HTML as `__LEADER_CHORDS__` JS variable.
 
 ## Why this works
 
