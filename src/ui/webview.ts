@@ -177,10 +177,12 @@ document.addEventListener("paste", (e: ClipboardEvent) => {
     e.preventDefault();
     e.stopPropagation();
     vscode.postMessage({ type: "textInput", data: `\x1b[200~${text}\x1b[201~` });
+    setTimeout(() => term.focus(), 0);
     return;
   }
   e.stopPropagation();
   vscode.postMessage({ type: "clipboardPaste" });
+  setTimeout(() => term.focus(), 0);
 }, true);
 
 document.getElementById("restartBtn")!.addEventListener("click", () => {

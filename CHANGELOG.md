@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.1] — 2026-07-03
+
+### Fixed
+
+- Right-click paste no longer loses terminal focus; refocus via `setTimeout(() => term.focus(), 0)` after paste event
+
 ## [1.5.0] — 2026-07-02
 
 ### Changed
