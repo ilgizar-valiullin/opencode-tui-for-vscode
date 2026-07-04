@@ -315,8 +315,17 @@ function resolveOcPath(configPath: string): string {
   // If it's just a command name, resolve via shell PATH
   if (!path.isAbsolute(configPath) && !configPath.includes(path.sep)) {
     try {
+      // Extend PATH with common npm bin directories — macOS GUI apps don't inherit shell PATH
+      const extra = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        path.join(os.homedir(), ".npm-global", "bin"),
+        path.join(os.homedir(), ".local", "bin"),
+      ];
+      const pathEnv = [process.env.PATH, ...extra].filter(Boolean).join(path.delimiter);
       const cmd = process.platform === "win32" ? `where ${configPath}` : `which ${configPath}`;
-      const result = execSync(cmd, { encoding: "utf8", timeout: 5000 }).trim().split(/\r?\n/)[0];
+      const result = execSync(cmd, { encoding: "utf8", timeout: 5000, env: { ...process.env, PATH: pathEnv } })
+        .trim().split(/\r?\n/)[0];
       if (result && existsSync(result)) return result.trim();
     } catch {
       // not found in PATH, fall through
