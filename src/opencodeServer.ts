@@ -1,4 +1,4 @@
-import { ChildProcess, spawn } from "child_process";
+import { ChildProcess, spawn, execSync } from "child_process";
 import { createServer } from "net";
 import { get } from "http";
 import { existsSync } from "fs";
@@ -305,9 +305,22 @@ function findNode(): string {
 }
 
 function resolveOcPath(configPath: string): string {
+  // Check known locations on Windows first
   if (process.platform === "win32" && process.env.LOCALAPPDATA) {
     const local = `${process.env.LOCALAPPDATA}\\OpenCode\\opencode.exe`;
     if (existsSync(local)) return local;
+  }
+  // If already a full valid path, use as-is
+  if (path.isAbsolute(configPath) && existsSync(configPath)) return configPath;
+  // If it's just a command name, resolve via shell PATH
+  if (!path.isAbsolute(configPath) && !configPath.includes(path.sep)) {
+    try {
+      const cmd = process.platform === "win32" ? `where ${configPath}` : `which ${configPath}`;
+      const result = execSync(cmd, { encoding: "utf8", timeout: 5000 }).trim().split(/\r?\n/)[0];
+      if (result && existsSync(result)) return result.trim();
+    } catch {
+      // not found in PATH, fall through
+    }
   }
   return configPath;
 }
