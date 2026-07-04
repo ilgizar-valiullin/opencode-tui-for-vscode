@@ -2,7 +2,7 @@
   "name": "opencode-tui-for-vscode",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "publisher": "opencode-tui-unofficial",
   "license": "MIT",
   "repository": {
@@ -137,6 +137,27 @@
           "type": "boolean",
           "default": true,
           "description": "%cfg.ctrlASelectAll.desc%"
+        },
+        "opencode-tui-unofficial.enterSendsMessage": {
+          "type": "boolean",
+          "default": true,
+          "description": "%cfg.enterSendsMessage.desc%"
+        },
+        "opencode-tui-unofficial.orphanCleanup.startupScan": {
+          "type": "boolean",
+          "default": {
+            "windows": true,
+            "default": false
+          },
+          "description": "%cfg.orphanCleanup.startupScan.desc%"
+        },
+        "opencode-tui-unofficial.orphanCleanup.watchdog": {
+          "type": "boolean",
+          "default": {
+            "windows": true,
+            "default": false
+          },
+          "description": "%cfg.orphanCleanup.watchdog.desc%"
         }
       }
     }

@@ -4,6 +4,7 @@ import { get } from "http";
 import { existsSync } from "fs";
 import { OpenCodeClient } from "./httpClient";
 import * as path from "path";
+import * as os from "os";
 
 const TAG = "[opencode]";
 
@@ -19,6 +20,106 @@ export class OpenCodeServerManager {
   private stdoutCallback_: ((data: string) => void) | null = null;
   private stdoutBuffer_: string[] = [];
   private mcpDisconnectCallback_: (() => void) | null = null;
+
+  // ─── Watchdog (static singleton) ───
+  private static watchdog_: ChildProcess | null = null;
+  /** Set by extension.ts from user config — controls whether watchdog spawns */
+  static watchdogEnabled = true;
+
+  /**
+   * Start the orphan-cleanup watchdog as a detached process.
+   * Spawns watchdog.js which monitors this extension host's stdin pipe.
+   * When the pipe breaks (extension host dies), watchdog waits 15s then
+   * runs WMI-based orphan cleanup.
+   */
+  static startWatchdog(): void {
+    if (this.watchdog_) return;
+
+    const watchdogPath = path.resolve(__dirname, "watchdog.js");
+    if (!existsSync(watchdogPath)) {
+      log("watchdog.js not found, skipping watchdog");
+      return;
+    }
+
+    let nodeExe: string;
+    try {
+      nodeExe = findNode();
+    } catch {
+      log("system Node.js not found, skipping watchdog");
+      return;
+    }
+
+    const watchdogLogFile = path.join(os.tmpdir(), `opencode-watchdog-${Date.now()}.log`);
+
+    try {
+      const proc = spawn(nodeExe, [watchdogPath, "--log-file", watchdogLogFile], {
+        stdio: ["pipe", "pipe", "pipe"],
+        detached: true,
+        windowsHide: true,
+        env: { ...process.env },
+      });
+
+      this.watchdog_ = proc;
+
+      let ready = false;
+      proc.stdout?.setEncoding("utf8");
+      proc.stdout?.on("data", (chunk: string) => {
+        if (!ready && chunk.includes("WATCHDOG_READY")) {
+          ready = true;
+          log(`Watchdog started (PID ${proc.pid})`);
+        }
+      });
+
+      proc.stderr?.setEncoding("utf8");
+      proc.stderr?.on("data", (chunk: string) => {
+        for (const line of chunk.split("\n").filter(Boolean)) {
+          log(`[watchdog:stderr] ${line.trim()}`);
+        }
+      });
+
+      proc.on("exit", (code) => {
+        log(`Watchdog exited (code ${code})`);
+        if (this.watchdog_ === proc) this.watchdog_ = null;
+      });
+
+      proc.on("error", (e) => {
+        logErr(`Watchdog error: ${e.message}`);
+        this.watchdog_ = null;
+      });
+
+      // Unref so it doesn't keep the process alive
+      proc.unref();
+
+      log(`Watchdog spawned (PID ${proc.pid}, log=${watchdogLogFile})`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logErr(`Failed to start watchdog: ${msg}`);
+    }
+  }
+
+  static stopWatchdog(): void {
+    if (this.watchdog_) {
+      try {
+        this.watchdog_.kill("SIGTERM");
+      } catch { /* ignore */ }
+      this.watchdog_ = null;
+    }
+  }
+
+  /**
+   * One-shot startup cleanup: scan and kill orphan opencode processes
+   * left from a previous crashed/stale extension session.
+   */
+  static async startupCleanup(): Promise<void> {
+    try {
+      const { runCleanup } = await import("./cleanup");
+      const count = await runCleanup({ quiet: false });
+      if (count > 0) log(`Startup cleanup removed ${count} orphan processes`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logErr(`Startup cleanup failed: ${msg.substring(0, 200)}`);
+    }
+  }
 
   get mcpPort(): number { return this.mcpPort_; }
   setMcpPort(port: number): void { this.mcpPort_ = port; }
@@ -57,14 +158,21 @@ export class OpenCodeServerManager {
     const helperPath = path.resolve(__dirname, "ptyHelper.js");
     const nodeExe = findNode();
 
-    log(`Starting PTY on port ${this.port_}, oc=${ocPath}`);
+    log(`Starting PTY on port ${this.port_}, oc=${ocPath}, exe=${nodeExe}`);
 
     return new Promise((resolve, reject) => {
       let settled = false;
       const done = (err?: Error) => {
         if (settled) return; settled = true;
         if (err) { logErr(`FAILED: ${err.message}`); reject(err); }
-        else { log(`Ready on port ${this.port_}`); resolve(); }
+        else {
+          log(`Ready on port ${this.port_}`);
+          // Start watchdog after server is healthy
+          if (OpenCodeServerManager.watchdogEnabled) {
+            OpenCodeServerManager.startWatchdog();
+          }
+          resolve();
+        }
       };
 
       const proc = spawn(nodeExe, [helperPath], {
@@ -152,10 +260,25 @@ export class OpenCodeServerManager {
 
   async stop(): Promise<void> {
     if (this.client_) { try { await this.client_.executeTuiCommand("app_exit"); } catch { /* */ } }
+
     if (this.helper_) {
-      this.helper_.stdin?.write('{"type":"kill"}\n');
-      this.helper_.kill(); this.helper_ = null;
+      const helper = this.helper_;
+      helper.stdin?.write('{"type":"kill"}\n');
+
+      // Give opencode up to 5s to exit gracefully and clean up child processes
+      await Promise.race([
+        new Promise<void>((resolve) => helper.once("exit", () => resolve())),
+        new Promise<void>((resolve) => setTimeout(resolve, 5000)),
+      ]);
+
+      // Force kill if still alive
+      if (this.helper_) {
+        log("Graceful shutdown timeout, force-killing helper");
+        this.helper_.kill();
+        this.helper_ = null;
+      }
     }
+
     this.client_ = null; this.port_ = 0;
     this.mcpDisconnectCallback_?.();
   }

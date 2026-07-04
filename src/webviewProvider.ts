@@ -244,6 +244,8 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
         leaderChords: cfg.get<string[]>("leaderChords", []),
         ctrlASelectAll: cfg.get<boolean>("ctrlASelectAll", true),
         enterSendsMessage: cfg.get<boolean>("enterSendsMessage", true),
+        orphanCleanupStartupScan: cfg.get<boolean>("orphanCleanup.startupScan", process.platform === "win32"),
+        orphanCleanupWatchdog: cfg.get<boolean>("orphanCleanup.watchdog", process.platform === "win32"),
       });
     }
     if (msg.type === "saveSettings") {
@@ -254,6 +256,8 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       await cfg.update("leaderChords", s.leaderChords as string[], vscode.ConfigurationTarget.Global);
       await cfg.update("ctrlASelectAll", s.ctrlASelectAll as boolean, vscode.ConfigurationTarget.Global);
       await cfg.update("enterSendsMessage", s.enterSendsMessage as boolean, vscode.ConfigurationTarget.Global);
+      await cfg.update("orphanCleanup.startupScan", s.orphanCleanupStartupScan as boolean, vscode.ConfigurationTarget.Global);
+      await cfg.update("orphanCleanup.watchdog", s.orphanCleanupWatchdog as boolean, vscode.ConfigurationTarget.Global);
     }
   }
 
@@ -314,6 +318,10 @@ html,body{height:100%;background:#0d1117;overflow:hidden}
 #settingsPanel .settings-header{padding:14px 20px;font-size:14px;font-weight:600;color:#f0f6fc;border-bottom:1px solid #21262d;letter-spacing:0.5px}
 #settingsPanel .section{padding:0 20px}
 #settingsPanel .section-title{padding:16px 0 8px;font-size:11px;font-weight:600;color:#58a6ff;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #21262d;margin:0 0 12px}
+#settingsPanel .platform-badge{display:inline-block;background:#21262d;color:#8b949e;font-size:9px;font-weight:400;text-transform:none;letter-spacing:0;padding:1px 6px;border-radius:3px;margin-left:6px;vertical-align:middle}
+#settingsPanel .checkbox-label input:disabled+.checkbox-visual{opacity:0.4;cursor:default}
+#settingsPanel .checkbox-label input:disabled~span{opacity:0.5}
+#settingsPanel .checkbox-label input:disabled:hover+.checkbox-visual{border-color:#30363d}
 #settingsPanel .section-title:first-of-type{padding-top:16px}
 #settingsPanel .field{margin-bottom:16px}
 #settingsPanel .field label{display:block;margin-bottom:5px;color:#8b949e;font-size:12px;font-weight:400}
@@ -351,6 +359,11 @@ html,body{height:100%;background:#0d1117;overflow:hidden}
 <div class="field"><label for="setLeaderChords">${vscode.l10n.t("Leader Chords")}</label><input type="text" id="setLeaderChords" placeholder="n,l,c,x,g,m,..." /><div class="desc">${vscode.l10n.t("Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m")}</div></div>
 <div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setCtrlASelectAll" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("Ctrl+A Select All (fix)")}</label><div class="desc" style="margin-left:40px"><div>${vscode.l10n.t("When ON: Ctrl+A selects all text in terminal")}</div><div>${vscode.l10n.t("When OFF: Ctrl+A goes to beginning of line like in bash")}</div></div></div>
 <div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setEnterSendsMessage" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("Enter sends message")}</label><div class="desc" style="margin-left:40px"><div>${vscode.l10n.t("When ON: Enter=send, Shift+Enter=newline")}</div><div>${vscode.l10n.t("When OFF: Enter=newline, Shift+Enter=send")}</div></div></div>
+</div>
+<div class="section">
+<div class="section-title">${vscode.l10n.t("Orphan Cleanup")} <span class="platform-badge">only for Windows</span></div>
+<div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setOrphanStartupScan" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("WMI scan on startup")}</label><div class="desc" style="margin-left:40px">${vscode.l10n.t("Scan for orphan opencode processes when extension activates")}</div></div>
+<div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setOrphanWatchdog" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("Watchdog process")}</label><div class="desc" style="margin-left:40px">${vscode.l10n.t("Detached process that monitors extension host and cleans orphans on crash/kill")}</div></div>
 </div>
 <div class="btn-row"><button class="btn-secondary" id="settingsCancelBtn">${vscode.l10n.t("Cancel")}</button><button class="btn-primary" id="settingsSaveBtn">${vscode.l10n.t("Save")}</button></div>
 </div></div>

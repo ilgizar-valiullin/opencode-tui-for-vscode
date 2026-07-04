@@ -45,12 +45,16 @@ window.addEventListener("message", (e) => {
   if (e.data.type === "terminalData") term.write(e.data.data as string);
   if (e.data.type === "focusTerminal") term.focus();
   if (e.data.type === "settingsData") {
-    const d = e.data as { opencodePath: string; serverPort: number; leaderChords: string[]; ctrlASelectAll: boolean; enterSendsMessage: boolean };
+    const d = e.data as { opencodePath: string; serverPort: number; leaderChords: string[]; ctrlASelectAll: boolean; enterSendsMessage: boolean; orphanCleanupStartupScan: boolean; orphanCleanupWatchdog: boolean };
     (document.getElementById("setOpenCodePath") as HTMLInputElement).value = d.opencodePath;
     (document.getElementById("setServerPort") as HTMLInputElement).value = String(d.serverPort);
     (document.getElementById("setLeaderChords") as HTMLInputElement).value = d.leaderChords.join(",");
     (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked = d.ctrlASelectAll;
     (document.getElementById("setEnterSendsMessage") as HTMLInputElement).checked = d.enterSendsMessage;
+    const ss = document.getElementById("setOrphanStartupScan") as HTMLInputElement;
+    const wd = document.getElementById("setOrphanWatchdog") as HTMLInputElement;
+    if (ss) ss.checked = d.orphanCleanupStartupScan;
+    if (wd) wd.checked = d.orphanCleanupWatchdog;
     document.getElementById("settingsOverlay")!.classList.add("open");
   }
   if (e.data.type === "serverInfo") {
@@ -209,6 +213,8 @@ document.getElementById("settingsBtn")!.addEventListener("click", () => {
 
 document.getElementById("settingsSaveBtn")!.addEventListener("click", () => {
   const chords = (document.getElementById("setLeaderChords") as HTMLInputElement).value;
+  const orphanStartup = (document.getElementById("setOrphanStartupScan") as HTMLInputElement)?.checked ?? true;
+  const orphanWatchdog = (document.getElementById("setOrphanWatchdog") as HTMLInputElement)?.checked ?? true;
   vscode.postMessage({
     type: "saveSettings",
     opencodePath: (document.getElementById("setOpenCodePath") as HTMLInputElement).value,
@@ -216,6 +222,8 @@ document.getElementById("settingsSaveBtn")!.addEventListener("click", () => {
     leaderChords: chords.split(",").map((s) => s.trim()).filter(Boolean),
     ctrlASelectAll: (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked,
     enterSendsMessage: (document.getElementById("setEnterSendsMessage") as HTMLInputElement).checked,
+    orphanCleanupStartupScan: orphanStartup,
+    orphanCleanupWatchdog: orphanWatchdog,
   });
   document.getElementById("settingsOverlay")!.classList.remove("open");
 });

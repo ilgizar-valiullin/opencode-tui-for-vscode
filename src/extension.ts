@@ -4,6 +4,7 @@ import * as path from "path";
 import * as crypto from "crypto";
 import * as os from "os";
 import { OpenCodeWebviewProvider } from "./webviewProvider";
+import { OpenCodeServerManager } from "./opencodeServer";
 import { attachFile, attachSelection } from "./commands/attachFile";
 import { createMcpServer } from "./mcp-server";
 import { vscodeEditorState } from "./vscode-editor-state";
@@ -22,6 +23,14 @@ let provider: OpenCodeWebviewProvider | null = null;
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log("[opencode] activate start");
+
+  // ─── Orphan cleanup settings (async, non-blocking) ───
+  const cfg = vscode.workspace.getConfiguration("opencode-tui-unofficial");
+  const isWin = process.platform === "win32";
+  OpenCodeServerManager.watchdogEnabled = cfg.get<boolean>("orphanCleanup.watchdog", isWin);
+  if (cfg.get<boolean>("orphanCleanup.startupScan", isWin)) {
+    OpenCodeServerManager.startupCleanup().catch(() => {});
+  }
 
   const origUhr = process.listeners("unhandledRejection");
   process.removeAllListeners("unhandledRejection");
@@ -126,4 +135,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {
   provider?.stopAllServers().catch(() => {});
+  // Watchdog stays alive — it detects extension host exit via stdin pipe break,
+  // waits 15s grace period, then cleans up orphan processes on its own.
 }
