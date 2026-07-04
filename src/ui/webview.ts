@@ -5,6 +5,7 @@ import "@xterm/xterm/css/xterm.css";
 declare const acquireVsCodeApi: () => { postMessage(msg: unknown): void };
 declare const __LEADER_CHORDS__: string[] | undefined;
 declare const __CTRL_A_SELECT_ALL__: boolean | undefined;
+declare const __ENTER_SENDS_MESSAGE__: boolean | undefined;
 
 const vscode = acquireVsCodeApi();
 
@@ -44,11 +45,12 @@ window.addEventListener("message", (e) => {
   if (e.data.type === "terminalData") term.write(e.data.data as string);
   if (e.data.type === "focusTerminal") term.focus();
   if (e.data.type === "settingsData") {
-    const d = e.data as { opencodePath: string; serverPort: number; leaderChords: string[]; ctrlASelectAll: boolean };
+    const d = e.data as { opencodePath: string; serverPort: number; leaderChords: string[]; ctrlASelectAll: boolean; enterSendsMessage: boolean };
     (document.getElementById("setOpenCodePath") as HTMLInputElement).value = d.opencodePath;
     (document.getElementById("setServerPort") as HTMLInputElement).value = String(d.serverPort);
     (document.getElementById("setLeaderChords") as HTMLInputElement).value = d.leaderChords.join(",");
     (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked = d.ctrlASelectAll;
+    (document.getElementById("setEnterSendsMessage") as HTMLInputElement).checked = d.enterSendsMessage;
     document.getElementById("settingsOverlay")!.classList.add("open");
   }
   if (e.data.type === "serverInfo") {
@@ -166,6 +168,14 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
     vscode.postMessage({ type: "selectAll" });
     return;
   }
+  if (e.code === "Enter" && el.contains(e.target as Node) && !e.ctrlKey && !e.altKey && !e.metaKey && !leaderActive) {
+    e.preventDefault();
+    e.stopPropagation();
+    const enterSends = __ENTER_SENDS_MESSAGE__ !== false;
+    const shouldSend = enterSends ? !e.shiftKey : e.shiftKey;
+    vscode.postMessage({ type: "textInput", data: shouldSend ? "\r" : "\n" });
+    return;
+  }
   if (e.key === "Escape" && el.contains(document.activeElement)) {
     vscode.postMessage({ type: "focusChange", focused: false });
   }
@@ -205,6 +215,7 @@ document.getElementById("settingsSaveBtn")!.addEventListener("click", () => {
     serverPort: parseInt((document.getElementById("setServerPort") as HTMLInputElement).value, 10) || 0,
     leaderChords: chords.split(",").map((s) => s.trim()).filter(Boolean),
     ctrlASelectAll: (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked,
+    enterSendsMessage: (document.getElementById("setEnterSendsMessage") as HTMLInputElement).checked,
   });
   document.getElementById("settingsOverlay")!.classList.remove("open");
 });

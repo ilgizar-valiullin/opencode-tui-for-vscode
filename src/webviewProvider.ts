@@ -243,6 +243,7 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
         serverPort: cfg.get<number>("serverPort", 0),
         leaderChords: cfg.get<string[]>("leaderChords", []),
         ctrlASelectAll: cfg.get<boolean>("ctrlASelectAll", true),
+        enterSendsMessage: cfg.get<boolean>("enterSendsMessage", true),
       });
     }
     if (msg.type === "saveSettings") {
@@ -252,6 +253,7 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       await cfg.update("serverPort", s.serverPort as number, vscode.ConfigurationTarget.Global);
       await cfg.update("leaderChords", s.leaderChords as string[], vscode.ConfigurationTarget.Global);
       await cfg.update("ctrlASelectAll", s.ctrlASelectAll as boolean, vscode.ConfigurationTarget.Global);
+      await cfg.update("enterSendsMessage", s.enterSendsMessage as boolean, vscode.ConfigurationTarget.Global);
     }
   }
 
@@ -287,6 +289,7 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
     const chords = readLeaderChords();
     const config = vscode.workspace.getConfiguration("opencode-tui-unofficial");
     const ctrlASelectAll = config.get<boolean>("ctrlASelectAll", true);
+    const enterSendsMessage = config.get<boolean>("enterSendsMessage", true);
 
     return `<!DOCTYPE html>
 <html><head>
@@ -346,11 +349,12 @@ html,body{height:100%;background:#0d1117;overflow:hidden}
 <div class="section">
 <div class="section-title">${vscode.l10n.t("Input")}</div>
 <div class="field"><label for="setLeaderChords">${vscode.l10n.t("Leader Chords")}</label><input type="text" id="setLeaderChords" placeholder="n,l,c,x,g,m,..." /><div class="desc">${vscode.l10n.t("Key chords for leader mode (Ctrl+X + letter). Comma-separated, e.g. n,l,c,x,g,m")}</div></div>
-<div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setCtrlASelectAll" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("Ctrl+A Select All (fix)")}</label></div>
+<div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setCtrlASelectAll" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("Ctrl+A Select All (fix)")}</label><div class="desc" style="margin-left:40px"><div>${vscode.l10n.t("When ON: Ctrl+A selects all text in terminal")}</div><div>${vscode.l10n.t("When OFF: Ctrl+A goes to beginning of line like in bash")}</div></div></div>
+<div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setEnterSendsMessage" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("Enter sends message")}</label><div class="desc" style="margin-left:40px"><div>${vscode.l10n.t("When ON: Enter=send, Shift+Enter=newline")}</div><div>${vscode.l10n.t("When OFF: Enter=newline, Shift+Enter=send")}</div></div></div>
 </div>
 <div class="btn-row"><button class="btn-secondary" id="settingsCancelBtn">${vscode.l10n.t("Cancel")}</button><button class="btn-primary" id="settingsSaveBtn">${vscode.l10n.t("Save")}</button></div>
 </div></div>
-<script nonce="${nonce}">var __LEADER_CHORDS__=${JSON.stringify(chords)};var __CTRL_A_SELECT_ALL__=${ctrlASelectAll}</script>
+<script nonce="${nonce}">var __LEADER_CHORDS__=${JSON.stringify(chords)};var __CTRL_A_SELECT_ALL__=${ctrlASelectAll};var __ENTER_SENDS_MESSAGE__=${enterSendsMessage}</script>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body></html>`;
   }

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.2] — 2026-07-04
+
+### Added
+
+- Settings toggle for Enter/Shift+Enter behavior (send vs. newline)
+- Two-line descriptions for checkbox settings in the settings modal
+- l10n translations for all new strings across 11 locales
+
+### Changed
+
+- Ctrl+A OFF description now reads "beginning of line like in bash"
+
 ## [1.5.1] — 2026-07-03
 
 ### Fixed
