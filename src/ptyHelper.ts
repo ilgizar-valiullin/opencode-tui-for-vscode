@@ -42,16 +42,22 @@ rl.on("line", (line: string) => {
     const mcpPort = (msg as any).mcpPort;
     if (mcpPort) env.OPENCODE_MCP_PORT = String(mcpPort);
 
-    pty = spawn(msg.path, args, {
-      name: "xterm-256color",
-      cols: 80,
-      rows: 24,
-      cwd,
-      env: env as { [k: string]: string },
-      useConptyDll: true,
-      conptyInheritCursor: false,
-      handleFlowControl: false,
-    });
+    try {
+      pty = spawn(msg.path, args, {
+        name: "xterm-256color",
+        cols: 80,
+        rows: 24,
+        cwd,
+        env: env as { [k: string]: string },
+        useConptyDll: true,
+        conptyInheritCursor: false,
+        handleFlowControl: false,
+      });
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      process.stderr.write("SPAWN_ERROR: " + errMsg + "\n");
+      process.exit(1);
+    }
 
     process.stdout.write("R" + JSON.stringify({ pid: pty.pid }) + "\0");
 
