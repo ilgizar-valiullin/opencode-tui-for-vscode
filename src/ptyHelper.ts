@@ -1,18 +1,18 @@
 /**
- * PTY helper тАФ runs under system Node.js (not Electron).
+ * PTY helper — runs under system Node.js (not Electron).
  * Spawns opencode with node-pty for proper terminal emulation.
  *
  * Protocol:
  *   Input (stdin, JSON-line):
- *     тЖТ {"type":"spawn","path":"opencode","port":1234}
- *     тЖТ {"type":"stdin","data":"text\n"}
- *     тЖТ {"type":"resize","cols":N,"rows":M}
- *     тЖТ {"type":"kill"}
+ *     → {"type":"spawn","path":"opencode","port":1234}
+ *     → {"type":"stdin","data":"text\n"}
+ *     → {"type":"resize","cols":N,"rows":M}
+ *     → {"type":"kill"}
  *
  *   Output (stdout, null-delimited frames):
- *     тЖР D<raw_stdout_data>\0
- *     тЖР R{"pid":12345}\0
- *     тЖР E{"code":0}\0
+ *     ← D<raw_stdout_data>\0
+ *     ← R{"pid":12345}\0
+ *     ← E{"code":0}\0
  */
 import { spawn } from "node-pty";
 import { createInterface } from "readline";
