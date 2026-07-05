@@ -113,7 +113,7 @@ export class OpenCodeServerManager {
   static async startupCleanup(): Promise<void> {
     try {
       const { runCleanup } = await import("./cleanup");
-      const count = await runCleanup({ quiet: false });
+      const count = await runCleanup();
       if (count > 0) log(`Startup cleanup removed ${count} orphan processes`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);

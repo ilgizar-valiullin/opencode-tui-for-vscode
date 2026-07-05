@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.10] — 2026-07-05
+
+### Changed
+
+- `runCleanup` rewritten to use native shell commands (`ps | awk` on Unix,
+  `Get-CimInstance` on Windows) instead of JS process-table parsing. Finds and
+  kills orphaned processes matching `node|opencode|mcp|ptyhelper` with PPID=1
+  (Unix) or dead parent (Windows) in a single pipeline.
+- ptyHelper now auto-exits on stdin close — when the extension host crashes,
+  the pipe breaks and ptyHelper terminates immediately without waiting for
+  the watchdog.
+
+### Removed
+
+- Legacy JS process enumeration (`ProcessInfo`, `findOrphans`, `findTree`,
+  `parsePsOutput`, `parseWmicList`, `win32FetchProcesses`, `unixFetchProcesses`,
+  `linuxProcFs`, `isOpenCodeRelated`, `killTree`).
+
 ## [1.5.8] — 2026-07-05
 
 ### Fixed

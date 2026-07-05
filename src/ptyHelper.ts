@@ -35,6 +35,9 @@ if (process.platform === "darwin") {
 
 const rl = createInterface({ input: process.stdin });
 
+// Auto-exit if parent dies — stdin pipe breaks, readline emits 'close'
+rl.on("close", () => process.exit(0));
+
 let pty: ReturnType<typeof spawn> | null = null;
 
 rl.on("line", (line: string) => {

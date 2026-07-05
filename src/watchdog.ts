@@ -81,7 +81,7 @@ function startGracePeriod(): void {
   setTimeout(async () => {
     log(`[watchdog:${pid}] Grace period ended. Running orphan cleanup...`);
     try {
-      const count = await runCleanup({ quiet: false });
+      const count = await runCleanup();
       log(`[watchdog:${pid}] Cleanup complete. Removed ${count} orphan processes.`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
