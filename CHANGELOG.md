@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.5] — 2026-07-05
+
+### Fixed
+
+- macOS: `posix_spawnp failed` error — node-pty ships `spawn-helper` without
+  execute permission (644), causing failure when VSIX extracts it. Fixed by
+  `chmodSync(0o755)` on spawn-helper at helper startup.
+  See node-pty#850 and node-pty#866.
+
+### Changed
+
+- Universal VSIX (single build, no `--target` matrix)
+- `resolveOcPath` resolves `opencode` via `which`/`where` with extended PATH
+  (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.npm-global/bin`, `~/.local/bin`)
+- CI simplified to ubuntu only
+- All locale files synced with matching keys
+- `spawn-helper` included in VSIX via `.vscodeignore`
+
 ## [1.5.2] — 2026-07-04
 
 ### Added

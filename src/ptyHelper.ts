@@ -16,6 +16,22 @@
  */
 import { spawn } from "node-pty";
 import { createInterface } from "readline";
+import { chmodSync } from "fs";
+import { join } from "path";
+
+// Fix node-pty spawn-helper permissions on macOS
+// node-pty ships spawn-helper with 644 (no +x) causing posix_spawnp failure
+// https://github.com/microsoft/node-pty/issues/850
+if (process.platform === "darwin") {
+  try {
+    chmodSync(
+      join(__dirname, "..", "node_modules", "node-pty", "prebuilds", `darwin-${process.arch}`, "spawn-helper"),
+      0o755
+    );
+  } catch {
+    // spawn-helper not found or already executable — proceed
+  }
+}
 
 const rl = createInterface({ input: process.stdin });
 
