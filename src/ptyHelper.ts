@@ -54,7 +54,9 @@ rl.on("line", (line: string) => {
         handleFlowControl: false,
       });
     } catch (e: unknown) {
-      const errMsg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      const errMsg = e instanceof Error
+        ? `${e.name}: ${e.message}` + (e.cause ? ` (cause: ${e.cause})` : "")
+        : String(e);
       process.stderr.write("SPAWN_ERROR: " + errMsg + "\n");
       process.exit(1);
     }

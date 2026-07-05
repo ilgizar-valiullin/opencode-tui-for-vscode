@@ -175,8 +175,21 @@ export class OpenCodeServerManager {
         }
       };
 
+      // Extend PATH with common npm bin dirs — macOS GUI apps don't inherit shell PATH
+      const extraBinDirs = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        path.join(os.homedir(), ".npm-global", "bin"),
+        path.join(os.homedir(), ".local", "bin"),
+      ];
+      const pathParts = (process.env.PATH || "").split(path.delimiter);
+      for (const d of extraBinDirs) {
+        if (!pathParts.includes(d)) pathParts.unshift(d);
+      }
+      const env = { ...process.env, PATH: pathParts.join(path.delimiter) };
+
       const proc = spawn(nodeExe, [helperPath], {
-        stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: { ...process.env },
+        stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env,
       });
       this.helper_ = proc;
 
@@ -315,14 +328,17 @@ function resolveOcPath(configPath: string): string {
   // If it's just a command name, resolve via shell PATH
   if (!path.isAbsolute(configPath) && !configPath.includes(path.sep)) {
     try {
-      // Extend PATH with common npm bin directories — macOS GUI apps don't inherit shell PATH
+      // Extend PATH with common npm bin dirs — macOS GUI apps don't inherit shell PATH
       const extra = [
         "/opt/homebrew/bin",
         "/usr/local/bin",
         path.join(os.homedir(), ".npm-global", "bin"),
         path.join(os.homedir(), ".local", "bin"),
       ];
-      const pathEnv = [process.env.PATH, ...extra].filter(Boolean).join(path.delimiter);
+      const oldPath = process.env.PATH || "";
+      const pp = oldPath.split(path.delimiter);
+      for (const d of extra) { if (!pp.includes(d)) pp.unshift(d); }
+      const pathEnv = pp.join(path.delimiter);
       const cmd = process.platform === "win32" ? `where ${configPath}` : `which ${configPath}`;
       const result = execSync(cmd, { encoding: "utf8", timeout: 5000, env: { ...process.env, PATH: pathEnv } })
         .trim().split(/\r?\n/)[0];
