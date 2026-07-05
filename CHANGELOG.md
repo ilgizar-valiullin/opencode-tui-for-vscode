@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.6] — 2026-07-05
+
+### Fixed
+
+- Orphan cleanup now detects `ptyHelper.js` as opencode-related process.
+  When the extension host crashes, `ptyHelper.js` survived (waiting for stdin)
+  and kept `opencode` alive — `findOrphans` saw opencode with a living parent
+  and skipped it. Both processes now get cleaned properly.
+
 ## [1.5.5] — 2026-07-05
 
 ### Fixed

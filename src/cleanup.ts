@@ -36,6 +36,7 @@ function isOpenCodeRelated(p: ProcessInfo): boolean {
 
   if (name === "opencode.exe" || name === "opencode") return true;
   if (name === "node.exe" || name === "node" || name === "nodejs") {
+    if (cmd.includes("ptyHelper")) return true;
     return MCP_PATTERNS.some((pat) => cmd.includes(pat));
   }
   if (isWin && (name === "cmd.exe" || name === "cmd")) {

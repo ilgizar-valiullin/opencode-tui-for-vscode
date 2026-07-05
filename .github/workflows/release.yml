@@ -51,7 +51,7 @@ jobs:
           cat > release-notes.md <<EOF
           ## Downloads
 
-          [opencode-tui-for-vscode.vsix](https://github.com/${{ github.repository }}/releases/download/$VERSION/opencode-tui-for-vscode.vsix) — универсальный VSIX для Windows, macOS (Intel + Apple Silicon), Linux
+          [opencode-tui-for-vscode.vsix](https://github.com/${{ github.repository }}/releases/download/$VERSION/opencode-tui-for-vscode.vsix) — universal VSIX for Windows, macOS (Intel + Apple Silicon), Linux
 
           ## What's Changed
 
