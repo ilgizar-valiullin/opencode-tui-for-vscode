@@ -16,6 +16,7 @@
  */
 import { spawn } from "node-pty";
 import { createInterface } from "readline";
+import { spawnSync } from "child_process";
 
 const rl = createInterface({ input: process.stdin });
 
@@ -43,6 +44,24 @@ rl.on("line", (line: string) => {
     if (mcpPort) env.OPENCODE_MCP_PORT = String(mcpPort);
 
     try {
+      // Pre-check: can the binary be found and executed at all?
+      const preCheck = spawnSync(msg.path, ["--version"], {
+        cwd, env, stdio: "pipe", timeout: 5000,
+      });
+      if (preCheck.error) {
+        process.stderr.write("PRE_CHECK_ERROR: " + preCheck.error.message + "\n");
+        process.exit(1);
+        return;
+      }
+      if (preCheck.status !== 0) {
+        process.stderr.write(
+          "PRE_CHECK_BAD_STATUS: exit=" + preCheck.status + " stderr=" +
+          (preCheck.stderr?.toString().trim() || "") + "\n"
+        );
+        process.exit(1);
+        return;
+      }
+
       pty = spawn(msg.path, args, {
         name: "xterm-256color",
         cols: 80,
