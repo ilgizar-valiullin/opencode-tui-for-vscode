@@ -31,18 +31,19 @@ const isWin = process.platform === "win32";
 function isOpenCodeRelated(p: ProcessInfo): boolean {
   const name = p.name.toLowerCase();
   const cmd = p.commandLine.toLowerCase();
+  const base = name.split(/[/\\]/).pop() || name;
 
   if (cmd.includes("watchdog.js")) return false;
 
-  if (name === "opencode.exe" || name === "opencode") return true;
-  if (name === "node.exe" || name === "node" || name === "nodejs") {
+  if (base === "opencode" || base === "opencode.exe") return true;
+  if (base === "node" || base === "node.exe" || base === "nodejs") {
     if (cmd.includes("ptyHelper")) return true;
     return MCP_PATTERNS.some((pat) => cmd.includes(pat));
   }
-  if (isWin && (name === "cmd.exe" || name === "cmd")) {
+  if (isWin && (base === "cmd.exe" || base === "cmd")) {
     return MCP_PATTERNS.some((pat) => cmd.includes(pat));
   }
-  if (!isWin && ["sh", "bash", "zsh", "dash"].includes(name)) {
+  if (!isWin && ["sh", "bash", "zsh", "dash"].includes(base)) {
     return MCP_PATTERNS.some((pat) => cmd.includes(pat));
   }
   return false;
@@ -67,7 +68,7 @@ async function win32FetchProcesses(): Promise<ProcessInfo[]> {
     proc.on("error", reject);
     proc.on("exit", (code) => {
       if (code !== 0 && !quietDefault) {
-        console.error("[cleanup] wmic exit code", code, stderr.substring(0, RW));
+        console.error("[opencode] [cleanup] wmic exit code", code, stderr.substring(0, RW));
       }
       resolve(parseWmicList(stdout));
     });
@@ -210,11 +211,11 @@ async function killTree(pid: number, tree: ProcessInfo[], opts?: CleanupOptions)
   if (isWin) {
     try {
       await execAsync(`taskkill /T /F /PID ${pid}`, { timeout: 5000 });
-      if (!quiet) console.log(`[cleanup] Killed PID ${pid} and its tree`);
+      if (!quiet) console.log(`[opencode] [cleanup] Killed PID ${pid} and its tree`);
     } catch (e: unknown) {
       if (!quiet) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.warn(`[cleanup] Failed to kill PID ${pid}: ${msg.substring(0, 200)}`);
+        console.warn(`[opencode] [cleanup] Failed to kill PID ${pid}: ${msg.substring(0, 200)}`);
       }
     }
   } else {
@@ -222,7 +223,7 @@ async function killTree(pid: number, tree: ProcessInfo[], opts?: CleanupOptions)
     await execAsync(`kill -TERM ${allPids.join(" ")}`, { timeout: 3000 }).catch(() => {});
     await new Promise((r) => setTimeout(r, 100));
     await execAsync(`kill -KILL ${allPids.join(" ")}`, { timeout: 3000 }).catch(() => {});
-    if (!quiet) console.log(`[cleanup] Killed PID ${pid} and its tree (${allPids.length} processes)`);
+    if (!quiet) console.log(`[opencode] [cleanup] Killed PID ${pid} and its tree (${allPids.length} processes)`);
   }
 }
 
@@ -244,21 +245,20 @@ export async function fetchProcesses(): Promise<ProcessInfo[]> {
 
 export async function runCleanup(opts?: CleanupOptions): Promise<number> {
   const quiet = opts?.quiet ?? quietDefault;
-  if (!quiet) console.log("[cleanup] Scanning for opencode orphan processes...");
+  if (!quiet) console.log("[opencode] [cleanup] Scanning for opencode orphan processes...");
 
   let procs: ProcessInfo[];
   try {
     procs = await fetchProcesses();
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[cleanup] Failed to fetch processes: ${msg}`);
+    console.log(`[opencode] [cleanup] Failed to fetch processes: ${msg}`);
     return 0;
   }
 
   const orphans = findOrphans(procs);
   if (orphans.length === 0) {
-    if (!quiet) console.log("[cleanup] No orphans found");
-    console.error("[cleanup] Result: 0 orphans");
+    if (!quiet) console.log("[opencode] [cleanup] No orphans found");
     return 0;
   }
 
@@ -270,7 +270,7 @@ export async function runCleanup(opts?: CleanupOptions): Promise<number> {
 
     if (!quiet) {
       const desc = allPids.map((p) => `  PID ${p.pid} (${p.name})`).join("\n");
-      console.log(`[cleanup] Orphan root: PID ${orphan.pid} (${orphan.name})\n${desc}`);
+      console.log(`[opencode] [cleanup] Orphan root: PID ${orphan.pid} (${orphan.name})\n${desc}`);
     }
 
     await killTree(orphan.pid, tree, opts);
@@ -278,8 +278,7 @@ export async function runCleanup(opts?: CleanupOptions): Promise<number> {
     for (const t of tree) killedPids.add(t.pid);
   }
 
-  if (!quiet) console.log(`[cleanup] Cleaned ${killedPids.size} orphan processes`);
-  console.error(`[cleanup] Result: ${killedPids.size} orphans cleaned`);
+  if (!quiet) console.log(`[opencode] [cleanup] Cleaned ${killedPids.size} orphan processes`);
   return killedPids.size;
 }
 
@@ -296,10 +295,10 @@ if (require.main === module && !process.env.OPENCODE_IS_WATCHDOG) {
 
     const poll = () => {
       if (!parentAlive(parentPid)) {
-        console.log("[cleanup] Parent died, waiting 15s grace period...");
+        console.log("[opencode] [cleanup] Parent died, waiting 15s grace period...");
         setTimeout(() => {
           runCleanup({ quiet }).then((count) => {
-            console.log(`[cleanup] Done, cleaned ${count} orphans`);
+            console.log(`[opencode] [cleanup] Done, cleaned ${count} orphans`);
             process.exit(0);
           });
         }, 15000);
@@ -310,7 +309,7 @@ if (require.main === module && !process.env.OPENCODE_IS_WATCHDOG) {
     poll();
   } else {
     runCleanup({ quiet }).then((count) => {
-      console.log(`[cleanup] Done, cleaned ${count} orphans`);
+      console.log(`[opencode] [cleanup] Done, cleaned ${count} orphans`);
       process.exit(0);
     });
   }

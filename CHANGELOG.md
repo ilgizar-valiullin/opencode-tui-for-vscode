@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.8] — 2026-07-05
+
+### Fixed
+
+- `isOpenCodeRelated` on macOS — `ps -eo comm` returns the full executable path
+  (e.g. `/usr/local/bin/node`), not basename `node`. All name comparisons now
+  use basename only, so orphan ptyHelper processes with PPID=1 are detected.
+- All cleanup log messages prefixed with `[opencode]` for visibility.
+
 ## [1.5.7] — 2026-07-05
 
 ### Fixed
@@ -7,8 +16,6 @@
 - Orphan cleanup now works on macOS/Linux — `findOrphans` was not detecting
   orphans because on Unix they get reparented to init (PID 1), which was always
   in the live process list. Added PPID=1 check for non-Windows platforms.
-- Cleanup now always prints its result to stderr (`[cleanup] Result: X orphans`)
-  so it's visible in the VS Code debug console regardless of the `quiet` setting.
 
 ### Changed
 
