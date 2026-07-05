@@ -1,4 +1,4 @@
-import { ChildProcess, spawn, execSync } from "child_process";
+import { ChildProcess, spawn } from "child_process";
 import { createServer } from "net";
 import { get } from "http";
 import { existsSync } from "fs";
@@ -21,9 +21,9 @@ export class OpenCodeServerManager {
   private stdoutBuffer_: string[] = [];
   private mcpDisconnectCallback_: (() => void) | null = null;
 
-  // ─── Watchdog (static singleton) ───
+  // тФАтФАтФА Watchdog (static singleton) тФАтФАтФА
   private static watchdog_: ChildProcess | null = null;
-  /** Set by extension.ts from user config — controls whether watchdog spawns */
+  /** Set by extension.ts from user config тАФ controls whether watchdog spawns */
   static watchdogEnabled = true;
 
   /**
@@ -175,21 +175,8 @@ export class OpenCodeServerManager {
         }
       };
 
-      // Extend PATH with common npm bin dirs — macOS GUI apps don't inherit shell PATH
-      const extraBinDirs = [
-        "/opt/homebrew/bin",
-        "/usr/local/bin",
-        path.join(os.homedir(), ".npm-global", "bin"),
-        path.join(os.homedir(), ".local", "bin"),
-      ];
-      const pathParts = (process.env.PATH || "").split(path.delimiter);
-      for (const d of extraBinDirs) {
-        if (!pathParts.includes(d)) pathParts.unshift(d);
-      }
-      const env = { ...process.env, PATH: pathParts.join(path.delimiter) };
-
       const proc = spawn(nodeExe, [helperPath], {
-        stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env,
+        stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: { ...process.env },
       });
       this.helper_ = proc;
 
@@ -318,34 +305,9 @@ function findNode(): string {
 }
 
 function resolveOcPath(configPath: string): string {
-  // Check known locations on Windows first
   if (process.platform === "win32" && process.env.LOCALAPPDATA) {
     const local = `${process.env.LOCALAPPDATA}\\OpenCode\\opencode.exe`;
     if (existsSync(local)) return local;
-  }
-  // If already a full valid path, use as-is
-  if (path.isAbsolute(configPath) && existsSync(configPath)) return configPath;
-  // If it's just a command name, resolve via shell PATH
-  if (!path.isAbsolute(configPath) && !configPath.includes(path.sep)) {
-    try {
-      // Extend PATH with common npm bin dirs — macOS GUI apps don't inherit shell PATH
-      const extra = [
-        "/opt/homebrew/bin",
-        "/usr/local/bin",
-        path.join(os.homedir(), ".npm-global", "bin"),
-        path.join(os.homedir(), ".local", "bin"),
-      ];
-      const oldPath = process.env.PATH || "";
-      const pp = oldPath.split(path.delimiter);
-      for (const d of extra) { if (!pp.includes(d)) pp.unshift(d); }
-      const pathEnv = pp.join(path.delimiter);
-      const cmd = process.platform === "win32" ? `where ${configPath}` : `which ${configPath}`;
-      const result = execSync(cmd, { encoding: "utf8", timeout: 5000, env: { ...process.env, PATH: pathEnv } })
-        .trim().split(/\r?\n/)[0];
-      if (result && existsSync(result)) return result.trim();
-    } catch {
-      // not found in PATH, fall through
-    }
   }
   return configPath;
 }

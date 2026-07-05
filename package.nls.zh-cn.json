@@ -13,8 +13,5 @@
   "cfg.serverPort.desc": "opencode 服务器的端口。0 = 随机可用端口。",
   "cmd.toggleFocus.title": "切换 OpenCode 焦点",
   "cfg.leaderChords.desc": "要拦截的前导和弦字符（例如 [\"n\",\"m\",\"l\"]）。为空则使用 tui.json 或内置默认值。",
-  "cfg.ctrlASelectAll.desc": "将Ctrl+A重定向为在输入字段中选择全部，而不是向终端发送光标到行首。",
-  "cfg.enterSendsMessage.desc": "按回车发送消息，按 Shift+Enter 换行（取消选中则相反）",
-  "cfg.orphanCleanup.startupScan.desc": "启动时运行孤立进程清理",
-  "cfg.orphanCleanup.watchdog.desc": "当父进程意外退出时清理孤立进程"
+  "cfg.ctrlASelectAll.desc": "将Ctrl+A重定向为在输入字段中选择全部，而不是向终端发送光标到行首。"
 }

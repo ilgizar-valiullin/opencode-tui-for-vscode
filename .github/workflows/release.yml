@@ -6,7 +6,23 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            asset_suffix: linux-x64
+          - os: windows-latest
+            target: win32-x64
+            asset_suffix: win32-x64
+          - os: ubuntu-latest
+            target: darwin-x64
+            asset_suffix: darwin-x64
+          - os: macos-latest
+            target: darwin-arm64
+            asset_suffix: darwin-arm64
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -19,12 +35,12 @@ jobs:
 
       - run: npm run build
 
-      - run: npx vsce package -o opencode-tui-for-vscode.vsix
+      - run: npx vsce package --target ${{ matrix.target }} -o opencode-tui-for-vscode-${{ matrix.asset_suffix }}.vsix
 
       - uses: actions/upload-artifact@v4
         with:
-          name: vsix
-          path: opencode-tui-for-vscode.vsix
+          name: vsix-${{ matrix.asset_suffix }}
+          path: opencode-tui-for-vscode-${{ matrix.asset_suffix }}.vsix
 
   publish:
     needs: build
@@ -39,8 +55,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: vsix
-          path: .
+          path: vsix-files
 
       - name: Generate release notes
         run: |
@@ -51,7 +66,12 @@ jobs:
           cat > release-notes.md <<EOF
           ## Downloads
 
-          [opencode-tui-for-vscode.vsix](https://github.com/${{ github.repository }}/releases/download/$VERSION/opencode-tui-for-vscode.vsix) — universal VSIX for Windows, macOS (Intel + Apple Silicon), Linux
+          | Platform | VSIX |
+          |----------|------|
+          | Windows x64 | opencode-tui-for-vscode-win32-x64.vsix |
+          | Linux x64 | opencode-tui-for-vscode-linux-x64.vsix |
+          | macOS Intel | opencode-tui-for-vscode-darwin-x64.vsix |
+          | macOS Apple Silicon | opencode-tui-for-vscode-darwin-arm64.vsix |
 
           ## What's Changed
 
@@ -67,6 +87,6 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
             --notes-file release-notes.md \
-            opencode-tui-for-vscode.vsix
+            vsix-files/*/*.vsix
         env:
           GH_TOKEN: ${{ github.token }}
