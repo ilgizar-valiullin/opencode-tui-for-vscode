@@ -1,26 +1,48 @@
-/**
- * PTY helper — runs under system Node.js (not Electron).
- * Spawns opencode with node-pty for proper terminal emulation.
- *
- * Protocol:
- *   Input (stdin, JSON-line):
- *     → {"type":"spawn","path":"opencode","port":1234}
- *     → {"type":"stdin","data":"text\n"}
- *     → {"type":"resize","cols":N,"rows":M}
- *     → {"type":"kill"}
- *
- *   Output (stdout, null-delimited frames):
- *     ← D<raw_stdout_data>\0
- *     ← R{"pid":12345}\0
- *     ← E{"code":0}\0
- */
-import { spawn } from "node-pty";
+import { spawn as ptySpawn, IPty } from "node-pty";
 import { createInterface } from "readline";
-import { spawnSync } from "child_process";
+import { spawn as cpSpawn, spawnSync } from "child_process";
+import { Readable, Writable } from "stream";
 
 const rl = createInterface({ input: process.stdin });
 
-let pty: ReturnType<typeof spawn> | null = null;
+let pty: IPty | null = null;
+let cpChild: ReturnType<typeof cpSpawn> | null = null;
+
+function fallbackSpawn(file: string, args: string[], cwd: string, env: Record<string, string>, cols: number, rows: number): IPty {
+  cpChild = cpSpawn(file, args, {
+    cwd, env, stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  let onDataCb: ((data: string) => void) | null = null;
+  let onExitCb: ((r: { exitCode: number }) => void) | null = null;
+
+  cpChild.stdout!.on("data", (chunk: Buffer) => {
+    if (onDataCb) onDataCb(chunk.toString("utf8"));
+  });
+
+  cpChild.stderr!.on("data", (chunk: Buffer) => {
+    if (onDataCb) onDataCb(chunk.toString("utf8"));
+  });
+
+  cpChild.on("exit", (code) => {
+    if (onExitCb) onExitCb({ exitCode: code ?? -1 });
+  });
+
+  cpChild.on("error", (err) => {
+    process.stderr.write("SPAWN_FALLBACK_ERROR: " + err.message + "\n");
+    if (onExitCb) onExitCb({ exitCode: 1 });
+  });
+
+  return {
+    pid: cpChild.pid ?? -1,
+    onData(cb: (data: string) => void) { onDataCb = cb; },
+    write(data: string) { cpChild?.stdin?.write(data); },
+    resize(_cols: number, _rows: number) {},
+    kill(signal?: string) { cpChild?.kill(signal as any); },
+    onExit(cb: (r: { exitCode: number; signal?: number }) => void) { onExitCb = cb; },
+  } as unknown as IPty;
+}
 
 rl.on("line", (line: string) => {
   let msg: { type: string; path?: string; port?: number; data?: string };
@@ -44,7 +66,6 @@ rl.on("line", (line: string) => {
     if (mcpPort) env.OPENCODE_MCP_PORT = String(mcpPort);
 
     try {
-      // Pre-check: can the binary be found and executed at all?
       const preCheck = spawnSync(msg.path, ["--version"], {
         cwd, env, stdio: "pipe", timeout: 5000,
       });
@@ -62,16 +83,21 @@ rl.on("line", (line: string) => {
         return;
       }
 
-      pty = spawn(msg.path, args, {
-        name: "xterm-256color",
-        cols: 80,
-        rows: 24,
-        cwd,
-        env: env as { [k: string]: string },
-        useConptyDll: true,
-        conptyInheritCursor: false,
-        handleFlowControl: false,
-      });
+      try {
+        pty = ptySpawn(msg.path, args, {
+          name: "xterm-256color",
+          cols: 80,
+          rows: 24,
+          cwd,
+          env: env as { [k: string]: string },
+          useConptyDll: true,
+          conptyInheritCursor: false,
+          handleFlowControl: false,
+        });
+      } catch (e) {
+        process.stderr.write("PTY_SPAWN_FAILED: " + (e instanceof Error ? e.message : String(e)) + " - falling back to child_process.spawn\n");
+        pty = fallbackSpawn(msg.path, args, cwd, env as Record<string, string>, 80, 24);
+      }
     } catch (e: unknown) {
       const errMsg = e instanceof Error
         ? `${e.name}: ${e.message}` + (e.cause ? ` (cause: ${e.cause})` : "")
@@ -92,17 +118,19 @@ rl.on("line", (line: string) => {
     });
   }
 
-  if (msg.type === "stdin" && msg.data && pty) {
-    pty.write(msg.data);
+  if (msg.type === "stdin" && msg.data) {
+    if (pty) pty.write(msg.data);
+    else if (cpChild?.stdin?.writable) cpChild.stdin.write(msg.data);
   }
 
-  if (msg.type === "resize" && pty) {
+  if (msg.type === "resize") {
     const { cols, rows } = msg as unknown as { cols: number; rows: number };
-    pty.resize(cols, rows);
+    if (pty) pty.resize(cols, rows);
   }
 
-  if (msg.type === "kill" && pty) {
-    pty.kill();
+  if (msg.type === "kill") {
+    if (pty) pty.kill();
+    else if (cpChild) cpChild.kill();
     process.exit(0);
   }
 });
