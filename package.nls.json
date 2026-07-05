@@ -15,6 +15,6 @@
   "cfg.leaderChords.desc": "Leader chord characters to intercept (e.g. [\"n\",\"m\",\"l\"]). Empty = use tui.json or built-in defaults.",
   "cfg.ctrlASelectAll.desc": "Redirect Ctrl+A to select-all in the input field instead of sending cursor-home to the terminal.",
   "cfg.enterSendsMessage.desc": "When ON: Enter sends message, Shift+Enter adds newline. When OFF: Enter adds newline, Shift+Enter sends message.",
-  "cfg.orphanCleanup.startupScan.desc": "Scan for orphan opencode processes via WMI when the extension activates (only for Windows).",
-  "cfg.orphanCleanup.watchdog.desc": "Spawn a detached process that monitors extension host health and cleans up orphan processes on crash or kill (only for Windows)."
+  "cfg.orphanCleanup.startupScan.desc": "Scan for orphan opencode processes when the extension activates.",
+  "cfg.orphanCleanup.watchdog.desc": "Spawn a detached process that monitors extension host health and cleans up orphan processes on crash or kill."
 }

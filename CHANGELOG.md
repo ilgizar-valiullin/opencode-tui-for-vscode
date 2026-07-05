@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.5.7] — 2026-07-05
+
+### Fixed
+
+- Orphan cleanup now works on macOS/Linux — `findOrphans` was not detecting
+  orphans because on Unix they get reparented to init (PID 1), which was always
+  in the live process list. Added PPID=1 check for non-Windows platforms.
+- Cleanup now always prints its result to stderr (`[cleanup] Result: X orphans`)
+  so it's visible in the VS Code debug console regardless of the `quiet` setting.
+
+### Changed
+
+- Orphan cleanup (watchdog + startup scan) now enabled by default on all platforms.
+  Previously defaults were Windows-only. Removed "only for Windows" labels from
+  settings UI and locale descriptions.
+
 ## [1.5.6] — 2026-07-05
 
 ### Fixed

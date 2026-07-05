@@ -150,6 +150,12 @@ export function findOrphans(procs: ProcessInfo[]): ProcessInfo[] {
   const orphans: ProcessInfo[] = [];
   for (const p of procs) {
     if (!isOpenCodeRelated(p)) continue;
+    // On Unix, orphaned processes are reparented to init (PID 1)
+    if (!isWin && p.ppid === 1) {
+      orphans.push(p);
+      continue;
+    }
+    // On Windows, orphaned child processes have PPID=0 when parent dies
     if (p.ppid !== 0 && !livePids.has(p.ppid)) {
       orphans.push(p);
     }
@@ -252,6 +258,7 @@ export async function runCleanup(opts?: CleanupOptions): Promise<number> {
   const orphans = findOrphans(procs);
   if (orphans.length === 0) {
     if (!quiet) console.log("[cleanup] No orphans found");
+    console.error("[cleanup] Result: 0 orphans");
     return 0;
   }
 
@@ -272,6 +279,7 @@ export async function runCleanup(opts?: CleanupOptions): Promise<number> {
   }
 
   if (!quiet) console.log(`[cleanup] Cleaned ${killedPids.size} orphan processes`);
+  console.error(`[cleanup] Result: ${killedPids.size} orphans cleaned`);
   return killedPids.size;
 }
 

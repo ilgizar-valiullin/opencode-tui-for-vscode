@@ -15,6 +15,6 @@
   "cfg.leaderChords.desc": "Символы лидер-аккордов для перехвата (например, [\"n\",\"m\",\"l\"]). Пусто = использовать tui.json или встроенные значения по умолчанию.",
   "cfg.ctrlASelectAll.desc": "Перенаправлять Ctrl+A на выделение всего текста в поле ввода вместо отправки курсора в начало строки в терминал.",
   "cfg.enterSendsMessage.desc": "ВКЛ: Enter отправляет сообщение, Shift+Enter — новая строка. ВЫКЛ: Enter — новая строка, Shift+Enter отправляет.",
-  "cfg.orphanCleanup.startupScan.desc": "Сканировать осиротевшие процессы opencode через WMI при активации расширения (только для Windows).",
-  "cfg.orphanCleanup.watchdog.desc": "Запускать отдельный процесс, следящий за здоровьем extension host'а и чистящий сирот при краше или убийстве (только для Windows)."
+  "cfg.orphanCleanup.startupScan.desc": "Сканировать осиротевшие процессы opencode при активации расширения.",
+  "cfg.orphanCleanup.watchdog.desc": "Запускать отдельный процесс, следящий за здоровьем extension host'а и чистящий сирот при краше или убийстве."
 }

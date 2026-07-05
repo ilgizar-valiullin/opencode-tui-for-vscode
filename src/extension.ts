@@ -26,9 +26,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // ─── Orphan cleanup settings (async, non-blocking) ───
   const cfg = vscode.workspace.getConfiguration("opencode-tui-unofficial");
-  const isWin = process.platform === "win32";
-  OpenCodeServerManager.watchdogEnabled = cfg.get<boolean>("orphanCleanup.watchdog", isWin);
-  if (cfg.get<boolean>("orphanCleanup.startupScan", isWin)) {
+  OpenCodeServerManager.watchdogEnabled = cfg.get<boolean>("orphanCleanup.watchdog", true);
+  if (cfg.get<boolean>("orphanCleanup.startupScan", true)) {
     OpenCodeServerManager.startupCleanup().catch(() => {});
   }
 

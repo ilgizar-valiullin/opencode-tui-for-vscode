@@ -244,8 +244,8 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
         leaderChords: cfg.get<string[]>("leaderChords", []),
         ctrlASelectAll: cfg.get<boolean>("ctrlASelectAll", true),
         enterSendsMessage: cfg.get<boolean>("enterSendsMessage", true),
-        orphanCleanupStartupScan: cfg.get<boolean>("orphanCleanup.startupScan", process.platform === "win32"),
-        orphanCleanupWatchdog: cfg.get<boolean>("orphanCleanup.watchdog", process.platform === "win32"),
+        orphanCleanupStartupScan: cfg.get<boolean>("orphanCleanup.startupScan", true),
+        orphanCleanupWatchdog: cfg.get<boolean>("orphanCleanup.watchdog", true),
       });
     }
     if (msg.type === "saveSettings") {
@@ -361,7 +361,7 @@ html,body{height:100%;background:#0d1117;overflow:hidden}
 <div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setEnterSendsMessage" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("Enter sends message")}</label><div class="desc" style="margin-left:40px"><div>${vscode.l10n.t("When ON: Enter=send, Shift+Enter=newline")}</div><div>${vscode.l10n.t("When OFF: Enter=newline, Shift+Enter=send")}</div></div></div>
 </div>
 <div class="section">
-<div class="section-title">${vscode.l10n.t("Orphan Cleanup")} <span class="platform-badge">only for Windows</span></div>
+<div class="section-title">${vscode.l10n.t("Orphan Cleanup")}</div>
 <div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setOrphanStartupScan" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("WMI scan on startup")}</label><div class="desc" style="margin-left:40px">${vscode.l10n.t("Scan for orphan opencode processes when extension activates")}</div></div>
 <div class="field checkbox-field"><label class="checkbox-label"><input type="checkbox" id="setOrphanWatchdog" /><span class="checkbox-visual">&#x2713;</span>${vscode.l10n.t("Watchdog process")}</label><div class="desc" style="margin-left:40px">${vscode.l10n.t("Detached process that monitors extension host and cleans orphans on crash/kill")}</div></div>
 </div>
