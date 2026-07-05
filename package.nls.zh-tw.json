@@ -13,5 +13,8 @@
   "cfg.serverPort.desc": "opencode 伺服器的連接埠。0 = 隨機可用連接埠。",
   "cmd.toggleFocus.title": "切換 OpenCode 焦點",
   "cfg.leaderChords.desc": "要攔截的前導和弦字元（例如 [\"n\",\"m\",\"l\"]）。為空則使用 tui.json 或內建預設值。",
-  "cfg.ctrlASelectAll.desc": "將Ctrl+A重新導向為在輸入欄位中全選，而不是向終端傳送游標到行首。"
+  "cfg.ctrlASelectAll.desc": "將Ctrl+A重新導向為在輸入欄位中全選，而不是向終端傳送游標到行首。",
+  "cfg.enterSendsMessage.desc": "Press Enter to send, Shift+Enter for new line",
+  "cfg.orphanCleanup.startupScan.desc": "Scan for and clean up orphan opencode processes on startup",
+  "cfg.orphanCleanup.watchdog.desc": "Enable watchdog to clean up orphan opencode processes after VS Code closes"
 }

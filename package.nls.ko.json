@@ -13,5 +13,8 @@
   "cfg.serverPort.desc": "opencode 서버 포트. 0 = 사용 가능한 임의 포트.",
   "cmd.toggleFocus.title": "OpenCode 포커스 전환",
   "cfg.leaderChords.desc": "가로챌 리더 코드 문자 (예: [\"n\",\"m\",\"l\"]). 비어 있으면 tui.json 또는 내장 기본값 사용.",
-  "cfg.ctrlASelectAll.desc": "Ctrl+A를 입력 필드에서 모두 선택으로 리디렉션하여 터미널로 커서 홈을 보내지 않습니다."
+  "cfg.ctrlASelectAll.desc": "Ctrl+A를 입력 필드에서 모두 선택으로 리디렉션하여 터미널로 커서 홈을 보내지 않습니다.",
+  "cfg.enterSendsMessage.desc": "Press Enter to send, Shift+Enter for new line",
+  "cfg.orphanCleanup.startupScan.desc": "Scan for and clean up orphan opencode processes on startup",
+  "cfg.orphanCleanup.watchdog.desc": "Enable watchdog to clean up orphan opencode processes after VS Code closes"
 }

@@ -13,5 +13,8 @@
   "cfg.serverPort.desc": "Port du serveur opencode. 0 = port disponible aléatoire.",
   "cmd.toggleFocus.title": "Basculer le focus OpenCode",
   "cfg.leaderChords.desc": "Caractères d'accord leader à intercepter (ex. [\"n\",\"m\",\"l\"]). Vide = utiliser tui.json ou les valeurs par défaut intégrées.",
-  "cfg.ctrlASelectAll.desc": "Rediriger Ctrl+A pour tout selectionner dans le champ de saisie au lieu d'envoyer debut de curseur au terminal."
+  "cfg.ctrlASelectAll.desc": "Rediriger Ctrl+A pour tout selectionner dans le champ de saisie au lieu d'envoyer debut de curseur au terminal.",
+  "cfg.enterSendsMessage.desc": "Press Enter to send, Shift+Enter for new line",
+  "cfg.orphanCleanup.startupScan.desc": "Scan for and clean up orphan opencode processes on startup",
+  "cfg.orphanCleanup.watchdog.desc": "Enable watchdog to clean up orphan opencode processes after VS Code closes"
 }

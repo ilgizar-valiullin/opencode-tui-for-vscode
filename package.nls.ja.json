@@ -13,5 +13,8 @@
   "cfg.serverPort.desc": "opencode サーバーのポート。0 = ランダムな空きポート。",
   "cmd.toggleFocus.title": "OpenCode フォーカス切り替え",
   "cfg.leaderChords.desc": "インターセプトするリーダーコード文字（例：[\"n\",\"m\",\"l\"]）。空の場合は tui.json またはビルトインのデフォルトを使用。",
-  "cfg.ctrlASelectAll.desc": "Ctrl+Aを入力フィールドの全選択にリダイレクトし、ターミナルにカーソルホームを送信しないようにします。"
+  "cfg.ctrlASelectAll.desc": "Ctrl+Aを入力フィールドの全選択にリダイレクトし、ターミナルにカーソルホームを送信しないようにします。",
+  "cfg.enterSendsMessage.desc": "Press Enter to send, Shift+Enter for new line",
+  "cfg.orphanCleanup.startupScan.desc": "Scan for and clean up orphan opencode processes on startup",
+  "cfg.orphanCleanup.watchdog.desc": "Enable watchdog to clean up orphan opencode processes after VS Code closes"
 }
