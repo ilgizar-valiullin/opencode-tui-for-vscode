@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.2.0] — 2026-10-27
+
+### Added
+
+- **Media paste pass-through** — pasting files (images, video, PDF, any type
+  copied from the OS) inserts their real paths into the TUI for it to attach,
+  exactly like a native terminal would; works via Ctrl+V and right-click
+  paste alike. Screenshots (clipboard bitmaps with no filesystem identity)
+  are materialized into `%TEMP%/opencode-tui-media/` first.
+
+### Fixed
+
+- Ctrl+V pasted twice (once via xterm `\x16` → clipboard read, once via the
+  browser `paste` event) — the key event is now left to the browser so only
+  a single paste is sent.
+- Pasted media no longer leaves a stray blank line above the attachment
+  (no trailing newline is sent, matching text paste).
+
 ## [2.1.0] — 2026-10-27
 
 ### Removed

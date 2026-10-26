@@ -212,6 +212,54 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
 }, true);
 
 document.addEventListener("paste", (e: ClipboardEvent) => {
+  // Files/media first: pass them through to the TUI the way a native
+  // terminal does. In Electron, files copied from the OS carry their real
+  // path on the File object — paste it as-is. Pure clipboard bitmaps
+  // (screenshots) have no filesystem identity, so forward their bytes for
+  // the host to materialize into a temp file.
+  const items = e.clipboardData?.items;
+  if (items) {
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file") {
+        const f = item.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      const paths: string[] = [];
+      const bitmapReads: Promise<{ name: string; mime: string; base64: string } | null>[] = [];
+      for (const f of files) {
+        const realPath = (f as File & { path?: unknown }).path;
+        if (typeof realPath === "string" && realPath) {
+          paths.push(realPath);
+        } else if (f.type.startsWith("image/")) {
+          bitmapReads.push(new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = String(reader.result ?? "");
+              const base64 = dataUrl.includes(",") ? dataUrl.split(",", 2)[1] : "";
+              resolve(base64 ? { name: f.name || "clipboard-image", mime: f.type, base64 } : null);
+            };
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(f);
+          }));
+        }
+      }
+      Promise.all(bitmapReads).then((bitmaps) => {
+        vscode.postMessage({
+          type: "pasteFiles",
+          paths,
+          bitmaps: bitmaps.filter((b) => b !== null),
+        });
+      });
+      setTimeout(() => term.focus(), 0);
+      return;
+    }
+  }
   const text = e.clipboardData?.getData("text/plain");
   if (text) {
     e.preventDefault();

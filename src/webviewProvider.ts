@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { OpenCodeServerManager } from "./opencodeServer";
+import { savePastedBitmap } from "./commands/pasteMedia";
 
 function extractLeaderChords(configDir: string, chords: Set<string>): void {
   const tuiPath = path.join(configDir, "tui.json");
@@ -204,6 +205,36 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
           webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
           vscode.window.showErrorMessage(vscode.l10n.t("Failed to start: {0}", m));
         }
+      }
+    }
+    if (msg.type === "pasteFiles") {
+      // Media/file paste: real OS paths go straight to the TUI (native
+      // terminal behavior); clipboard bitmaps without a path were
+      // materialized by the host into temp files first.
+      const m = msg as { paths?: unknown; bitmaps?: unknown };
+      const paths = Array.isArray(m.paths)
+        ? m.paths.filter((p): p is string => typeof p === "string" && p.length > 0)
+        : [];
+      const raws = Array.isArray(m.bitmaps) ? m.bitmaps : [];
+      if (server.isRunning()) {
+        for (const b of raws) {
+          const bb = b as { name?: unknown; mime?: unknown; base64?: unknown };
+          const r = await savePastedBitmap({
+            name: typeof bb.name === "string" ? bb.name : "clipboard-image",
+            mime: typeof bb.mime === "string" ? bb.mime : "",
+            base64: typeof bb.base64 === "string" ? bb.base64 : "",
+          });
+          if (r.ok) paths.push(r.path);
+          else vscode.window.showErrorMessage(r.error);
+        }
+        if (paths.length > 0) {
+          // No trailing newline: like text paste, only insert — the TUI
+          // attaches the paths in place. (A trailing \n would render as a
+          // blank line above the attachment.)
+          server.writeToStdin(`\x1b[200~${paths.join(" ")}\x1b[201~`);
+        }
+      } else {
+        vscode.window.showErrorMessage("OpenCode server is not running");
       }
     }
     if (msg.type === "clipboardPaste") {

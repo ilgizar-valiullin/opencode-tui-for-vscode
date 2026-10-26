@@ -252,6 +252,7 @@ The `selectAll` message triggers `OpenCodeClient.executeTuiCommand("input_select
 - Multi-line pastes don't execute immediately in bash/zsh
 - `handlePaste` command registered as `opencode-tui-unofficial.handlePaste` for programmatic use
 - Clipboard read permission may trigger a VS Code permission prompt on first use
+- Media/file paste: real OS paths from the clipboard (Electron exposes them on pasted File objects) are pasted bracketed for the TUI to attach, exactly like a native terminal would; pure clipboard bitmaps (screenshots, no filesystem identity) are materialized into `%TEMP%/opencode-tui-media/` first since a path is the only thing a PTY can carry
 
 ---
 
