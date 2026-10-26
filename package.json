@@ -2,7 +2,7 @@
   "name": "opencode-tui-for-vscode",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.5.10",
+  "version": "2.0.0",
   "publisher": "opencode-tui-unofficial",
   "license": "MIT",
   "repository": {
@@ -184,6 +184,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-unicode11": "^0.8.0",
     "node-pty": "^1.1.0"
   }
 }

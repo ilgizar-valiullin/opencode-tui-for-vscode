@@ -1,7 +1,8 @@
-import { ChildProcess, spawn, execSync } from "child_process";
+import { ChildProcess, spawn, execSync, execFileSync } from "child_process";
+import { randomBytes } from "crypto";
 import { createServer } from "net";
 import { get } from "http";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { OpenCodeClient } from "./httpClient";
 import * as path from "path";
 import * as os from "os";
@@ -13,10 +14,12 @@ function logErr(msg: string): void { console.error(`${TAG} ${msg}`); }
 
 export class OpenCodeServerManager {
   private helper_: ChildProcess | null = null;
+  private serve_: ChildProcess | null = null;
   private port_: number = 0;
   private client_: OpenCodeClient | null = null;
   private cwd_: string = "";
   private mcpPort_: number = 0;
+  private password_: string | null = null;
   private stdoutCallback_: ((data: string) => void) | null = null;
   private stdoutBuffer_: string[] = [];
   private mcpDisconnectCallback_: (() => void) | null = null;
@@ -155,10 +158,111 @@ export class OpenCodeServerManager {
     this.port_ = preferredPort && preferredPort > 0 ? preferredPort : await findFreePort();
     this.cwd_ = cwd ?? process.cwd();
     const ocPath = resolveOcPath(openCodePath);
+    const major = detectMajorVersion(ocPath);
+    if (major === 2) return this.startV2(ocPath);
+    return this.startV1(ocPath, cwd);
+  }
+
+  /**
+   * v1 flow: single `opencode --port N` process hosts both the TUI (in the
+   * PTY) and the open REST API. Unchanged legacy behavior.
+   */
+  private async startV1(ocPath: string, cwd?: string): Promise<void> {
+    const spawnMsg: Record<string, unknown> = { type: "spawn", path: ocPath, port: this.port_ };
+    if (cwd) spawnMsg.cwd = cwd;
+    if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
+    return this.spawnTuiPty(ocPath, spawnMsg, "Starting PTY (v1)", true);
+  }
+
+  /**
+   * v2 flow: headless `serve --port N` (own child process, password-secured
+   * API) + TUI in the PTY attached via `--server <url>`. The same generated
+   * OPENCODE_SERVER_PASSWORD is shared by both processes and the API client.
+   */
+  private async startV2(ocPath: string): Promise<void> {
+    // serve runs via plain child_process.spawn (no shell, no PTY), so it
+    // needs the direct .exe rather than a .cmd shim.
+    const exe = toDirectExecutable(ocPath);
+    const password = randomBytes(24).toString("hex");
+    this.password_ = password;
+    const base = `http://127.0.0.1:${this.port_}`;
+
+    log(`Starting v2 serve on port ${this.port_}, oc=${exe}`);
+
+    const serve = spawn(exe, ["serve", "--port", String(this.port_)], {
+      stdio: "ignore",
+      windowsHide: true,
+      env: {
+        ...process.env,
+        OPENCODE_SERVER_PASSWORD: password,
+        ...(this.mcpPort_ ? { OPENCODE_MCP_PORT: String(this.mcpPort_) } : {}),
+      },
+    });
+    this.serve_ = serve;
+    serve.on("error", (e) => logErr(`serve spawn failed: ${e.message}`));
+    serve.on("exit", (code) => {
+      log(`serve exited (code ${code})`);
+      if (this.serve_ === serve) {
+        this.serve_ = null;
+        this.client_ = null;
+        this.mcpDisconnectCallback_?.();
+      }
+    });
+
+    this.client_ = new OpenCodeClient(base, { password, v2: true });
+    await this.pollInfo(30000);
+
+    const spawnMsg: Record<string, unknown> = {
+      type: "spawn",
+      path: exe,
+      args: ["--server", base],
+      cwd: this.cwd_,
+      password,
+    };
+    if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
+    return this.spawnTuiPty(ocPath, spawnMsg, "Starting TUI (v2)", false);
+  }
+
+  /** Wait until the v2 serve API answers (or the serve process dies). */
+  private pollInfo(timeoutMs: number): Promise<void> {
+    const t0 = Date.now();
+    return new Promise((resolve, reject) => {
+      const poll = () => {
+        if (!this.serve_ || !this.client_) {
+          reject(new Error("serve exited before becoming ready"));
+          return;
+        }
+        this.client_.health().then((s) => {
+          if (s.healthy) resolve();
+          else setTimeout(poll, 500);
+        }).catch(() => {
+          if (!this.serve_) {
+            reject(new Error("serve exited before becoming ready"));
+            return;
+          }
+          if (Date.now() - t0 > timeoutMs) reject(new Error("Timed out waiting for opencode serve API"));
+          else setTimeout(poll, 500);
+        });
+      };
+      poll();
+    });
+  }
+
+  /**
+   * Spawn the TUI inside the node-pty helper. v1 waits for the legacy
+   * /global/health poll; v2 resolves once the PTY reports the child pid
+   * (the serve API was already proven healthy before attaching the TUI).
+   */
+  private spawnTuiPty(
+    ocPath: string,
+    spawnMsg: Record<string, unknown>,
+    spawnLabel: string,
+    waitForHttpHealth: boolean
+  ): Promise<void> {
     const helperPath = path.resolve(__dirname, "ptyHelper.js");
     const nodeExe = findNode();
 
-    log(`Starting PTY on port ${this.port_}, oc=${ocPath}, exe=${nodeExe}`);
+    log(`${spawnLabel} on port ${this.port_}, oc=${ocPath}, exe=${nodeExe}`);
 
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -209,7 +313,10 @@ export class OpenCodeServerManager {
 
           if (prefix === "R") {
             try { const m = JSON.parse(payload); log(`PTY pid=${m.pid}`); } catch { /* */ }
-            if (!settled) pollHealth();
+            if (!settled) {
+              if (waitForHttpHealth) pollHealth();
+              else done();
+            }
           }
           else           if (prefix === "D") {
             if (this.stdoutCallback_) this.stdoutCallback_(payload);
@@ -224,10 +331,6 @@ export class OpenCodeServerManager {
           }
         }
       });
-
-      const spawnMsg: Record<string, unknown> = { type: "spawn", path: ocPath, port: this.port_ };
-      if (cwd) spawnMsg.cwd = cwd;
-      if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
 
       this.helper_.stdin?.write(JSON.stringify(spawnMsg) + "\n");
 
@@ -279,7 +382,20 @@ export class OpenCodeServerManager {
       }
     }
 
-    this.client_ = null; this.port_ = 0;
+    if (this.serve_) {
+      const serve = this.serve_;
+      this.serve_ = null;
+      if (serve.exitCode === null) {
+        try { serve.kill(); } catch { /* */ }
+        await Promise.race([
+          new Promise<void>((resolve) => serve.once("exit", () => resolve())),
+          new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+        ]);
+        try { serve.kill(); } catch { /* */ }
+      }
+    }
+
+    this.client_ = null; this.port_ = 0; this.password_ = null;
     this.mcpDisconnectCallback_?.();
   }
 
@@ -304,25 +420,139 @@ function findNode(): string {
   );
 }
 
-function resolveOcPath(configPath: string): string {
-  // Check known locations on Windows first
-  if (process.platform === "win32" && process.env.LOCALAPPDATA) {
-    const local = `${process.env.LOCALAPPDATA}\\OpenCode\\opencode.exe`;
-    if (existsSync(local)) return local;
+function resolveViaPath(name: string): string {
+  const cmd = process.platform === "win32" ? `where ${name}` : `which ${name}`;
+  let out = "";
+  try {
+    out = execSync(cmd, { encoding: "utf8", timeout: 5000 }).trim();
+  } catch {
+    throw new Error(
+      `opencode not found in PATH (looked up "${name}"). Install opencode or set opencode-tui-unofficial.opencodePath to a full path.`
+    );
   }
-  // If already a full valid path, use as-is
-  if (path.isAbsolute(configPath) && existsSync(configPath)) return configPath;
-  // If it's just a command name, resolve via shell PATH
-  if (!path.isAbsolute(configPath) && !configPath.includes(path.sep)) {
-    try {
-      const cmd = process.platform === "win32" ? `where ${configPath}` : `which ${configPath}`;
-      const result = execSync(cmd, { encoding: "utf8", timeout: 5000 }).trim().split(/\r?\n/)[0];
-      if (result && existsSync(result)) return result.trim();
-    } catch {
-      // not found in PATH, fall through
+  const candidates = out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  if (process.platform === "win32") {
+    // Prefer directly runnable binaries. npm-style .cmd/.bat shims are
+    // resolved to their underlying .exe so plain child_process.spawn and
+    // execFileSync (which cannot run batch files) work and kill() targets
+    // the real process instead of an orphaning cmd.exe wrapper.
+    let fallback: string | null = null;
+    for (const c of candidates) {
+      const lower = c.toLowerCase();
+      let present = false;
+      try { present = existsSync(c); } catch { /* */ }
+      if (!present) continue;
+      if (lower.endsWith(".exe")) return c;
+      if (lower.endsWith(".cmd") || lower.endsWith(".bat")) {
+        const target = resolveCmdShimTarget(c);
+        if (target) return target;
+        fallback = fallback ?? c;
+        continue;
+      }
+      fallback = fallback ?? c;
+    }
+    if (fallback) return fallback;
+  } else {
+    for (const c of candidates) {
+      try { if (existsSync(c)) return c; } catch { /* */ }
     }
   }
-  return configPath;
+  throw new Error(
+    `opencode not found in PATH (looked up "${name}"). Install opencode or set opencode-tui-unofficial.opencodePath to a full path.`
+  );
+}
+
+function resolveOcPath(configPath: string): string {
+  const trimmed = (configPath ?? "").trim();
+  // Not configured or bare "opencode" -> resolve via PATH
+  if (!trimmed || trimmed === "opencode") {
+    return resolveViaPath("opencode");
+  }
+  // Explicit path (absolute or contains a separator) -> use as-is, error if missing
+  if (path.isAbsolute(trimmed) || trimmed.includes(path.sep) || trimmed.includes("/")) {
+    if (existsSync(trimmed)) return trimmed;
+    throw new Error(`opencode not found at configured path: ${trimmed}`);
+  }
+  // Any other bare command name -> resolve that name via PATH, error if missing
+  return resolveViaPath(trimmed);
+}
+
+/**
+ * Best-effort resolution of a Windows .cmd/.bat shim (npm-style) to the
+ * underlying .exe it wraps, e.g. "%dp0%\node_modules\<pkg>\bin\app.exe".
+ * Returns null when no runnable target can be determined.
+ */
+function resolveCmdShimTarget(cmdPath: string): string | null {
+  let text = "";
+  try {
+    text = readFileSync(cmdPath, "utf8");
+  } catch {
+    return null;
+  }
+  const dir = path.dirname(cmdPath);
+  const dp0 = /%~?dp0%([^"\r\n]*?\.exe)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = dp0.exec(text)) !== null) {
+    const full = path.join(dir, m[1].replace(/\//g, path.sep));
+    try {
+      if (existsSync(full)) return full;
+    } catch { /* */ }
+  }
+  const abs = text.match(/"([A-Za-z]:\\[^"]+?\.exe)"/i);
+  if (abs) {
+    try {
+      if (existsSync(abs[1])) return abs[1];
+    } catch { /* */ }
+  }
+  return null;
+}
+
+/**
+ * Map a resolved opencode path to something plain child_process APIs can
+ * execute directly (no shell). .exe passes through; .cmd/.bat must resolve
+ * to their target .exe, otherwise an actionable error is thrown.
+ */
+function toDirectExecutable(ocPath: string): string {
+  if (process.platform !== "win32") return ocPath;
+  const lower = ocPath.toLowerCase();
+  if (lower.endsWith(".exe")) return ocPath;
+  if (lower.endsWith(".cmd") || lower.endsWith(".bat")) {
+    const target = resolveCmdShimTarget(ocPath);
+    if (target) return target;
+    throw new Error(
+      `opencode shim "${ocPath}" does not point at a runnable .exe. ` +
+      `Set opencode-tui-unofficial.opencodePath to the full opencode.exe path.`
+    );
+  }
+  return ocPath;
+}
+
+function detectMajorVersion(ocPath: string): 1 | 2 {
+  let out = "";
+  try {
+    // .cmd/.bat cannot run via execFileSync (CreateProcess); go through the
+    // shell for those so --version works for any shim. .exe runs directly.
+    const lower = ocPath.toLowerCase();
+    if (process.platform === "win32" && (lower.endsWith(".cmd") || lower.endsWith(".bat") || lower.endsWith(".ps1"))) {
+      out = execSync(`"${ocPath}" --version`, { encoding: "utf8", timeout: 10000 }).trim();
+    } else {
+      out = execFileSync(ocPath, ["--version"], { encoding: "utf8", timeout: 10000 }).trim();
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`Cannot run "${ocPath}" --version: ${msg.substring(0, 200)}`);
+  }
+  const m = out.match(/(\d+)\.\d+\.\d+/);
+  if (!m) {
+    throw new Error(
+      `Unrecognized opencode version output: "${out.substring(0, 120)}" (need v1.x or v2.x)`
+    );
+  }
+  const major = parseInt(m[1], 10);
+  if (major === 1 || major === 2) return major;
+  throw new Error(
+    `Unsupported opencode major version ${major} (need v1.x or v2.x): "${out.substring(0, 120)}"`
+  );
 }
 
 function findFreePort(): Promise<number> {
@@ -336,5 +566,3 @@ function findFreePort(): Promise<number> {
     s.on("error", reject);
   });
 }
-
-

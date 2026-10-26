@@ -5,6 +5,10 @@
  * Protocol:
  *   Input (stdin, JSON-line):
  *     → {"type":"spawn","path":"opencode","port":1234}
+ *         v1 TUI: args default to ["--port", port]
+ *     → {"type":"spawn","path":"opencode","args":["--server","http://127.0.0.1:1234"]}
+ *         v2 TUI: explicit argv (port optional); optional "password" sets
+ *         OPENCODE_SERVER_PASSWORD for the child, "cwd"/"mcpPort" as before
  *     → {"type":"stdin","data":"text\n"}
  *     → {"type":"resize","cols":N,"rows":M}
  *     → {"type":"kill"}
@@ -44,9 +48,13 @@ rl.on("line", (line: string) => {
   let msg: { type: string; path?: string; port?: number; data?: string };
   try { msg = JSON.parse(line); } catch { return; }
 
-  if (msg.type === "spawn" && msg.path && msg.port) {
+  if (msg.type === "spawn" && msg.path && (msg.port || (msg as any).args)) {
     const cwd = (msg as any).cwd || process.env.USERPROFILE || process.cwd();
-    const args = ["--port", String(msg.port)];
+    const rawArgs = (msg as any).args;
+    const args: string[] =
+      Array.isArray(rawArgs) && rawArgs.length > 0
+        ? rawArgs.map(String)
+        : ["--port", String(msg.port)];
 
     const env = { ...process.env };
     delete env.WT_SESSION;
@@ -60,6 +68,9 @@ rl.on("line", (line: string) => {
 
     const mcpPort = (msg as any).mcpPort;
     if (mcpPort) env.OPENCODE_MCP_PORT = String(mcpPort);
+
+    const childPassword = (msg as any).password;
+    if (childPassword) env.OPENCODE_SERVER_PASSWORD = String(childPassword);
 
     pty = spawn(msg.path, args, {
       name: "xterm-256color",

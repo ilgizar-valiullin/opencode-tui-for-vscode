@@ -1,5 +1,6 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 import "@xterm/xterm/css/xterm.css";
 
 declare const acquireVsCodeApi: () => { postMessage(msg: unknown): void };
@@ -11,8 +12,9 @@ const vscode = acquireVsCodeApi();
 
 const term = new Terminal({
   convertEol: true,
+  allowProposedApi: true,
   fontSize: 14,
-  fontFamily: "'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace",
+  fontFamily: "'Cascadia Code','CaskaydiaCove Nerd Font','FiraCode Nerd Font','JetBrainsMono Nerd Font','Consolas',monospace",
   theme: {
     background: "#0d1117", foreground: "#c9d1d9", cursor: "#58a6ff",
     black: "#161b22", red: "#f78166", green: "#3fb950", yellow: "#d29922",
@@ -26,6 +28,12 @@ const term = new Terminal({
 const fitAddon = new FitAddon();
 term.loadAddon(fitAddon);
 
+// Unicode 11 width tables so wide/ambiguous glyphs (icons, CJK, emoji)
+// occupy the correct cell count and don't shift the TUI layout.
+const unicode11Addon = new Unicode11Addon();
+term.loadAddon(unicode11Addon);
+term.unicode.activeVersion = "11";
+
 let startedOnce = false;
 
 const el = document.getElementById("terminal")!;
@@ -37,13 +45,25 @@ term.attachCustomKeyEventHandler((e) => {
 fitAddon.fit();
 
 new ResizeObserver(() => {
-  fitAddon.fit();
-  vscode.postMessage({ type: "resize", cols: term.cols, rows: term.rows });
+  fitAndReport();
 }).observe(el);
+
+function fitAndReport(): void {
+  fitAddon.fit();
+  // Skip degenerate sizes while the panel is hidden; the PTY keeps its
+  // current size until a real viewport is measurable.
+  if (term.cols > 1 && term.rows > 1) {
+    vscode.postMessage({ type: "resize", cols: term.cols, rows: term.rows });
+  }
+}
 
 window.addEventListener("message", (e) => {
   if (e.data.type === "terminalData") term.write(e.data.data as string);
   if (e.data.type === "focusTerminal") term.focus();
+  if (e.data.type === "resize") {
+    // Extension asks for current dims (e.g. panel became visible).
+    fitAndReport();
+  }
   if (e.data.type === "settingsData") {
     const d = e.data as { opencodePath: string; serverPort: number; leaderChords: string[]; ctrlASelectAll: boolean; enterSendsMessage: boolean; orphanCleanupStartupScan: boolean; orphanCleanupWatchdog: boolean };
     (document.getElementById("setOpenCodePath") as HTMLInputElement).value = d.opencodePath;
@@ -72,10 +92,12 @@ window.addEventListener("message", (e) => {
         term.clear();
         term.write(`\r\n\x1b[33m[Server restarted on ${d.address}:${d.port}]\x1b[0m\r\n`);
         term.focus();
-        fitAddon.fit();
-        vscode.postMessage({ type: "resize", cols: term.cols, rows: term.rows });
       }
       startedOnce = true;
+      // The PTY spawns at the 80x24 fallback before the panel is measured;
+      // report the real viewport once the server is up so the TUI repaints
+      // fullscreen (also repairs resizes that happened while hidden).
+      fitAndReport();
     } else {
       addrEl.textContent = "Server: Stopped";
       restartBtn.disabled = true;

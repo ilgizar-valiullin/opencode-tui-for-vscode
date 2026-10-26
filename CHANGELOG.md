@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.0.0] — 2026-10-27
+
+### Added
+
+- **OpenCode v2 support** (full v1 compatibility kept) — the CLI major version
+  is detected via `opencode --version` and the matching flow is used:
+  - v1: single `opencode --port <n>` process hosting both the TUI and the open
+    REST API (unchanged behavior).
+  - v2: headless `serve --port <n>` with a generated `OPENCODE_SERVER_PASSWORD`
+    plus the TUI attached in the PTY via `opencode --server <url>`; the API
+    client uses Basic auth, the `/api` prefix, and unwraps `{"data"}` envelopes.
+- Windows `.cmd`/`.bat` shims are resolved to the underlying `.exe` so plain
+  process spawn and `kill()` target the real binary (no orphaned `cmd.exe`).
+
+### Changed
+
+- Binary resolution is strictly PATH-first: empty config or `"opencode"`
+  resolves via `where`/`which`; an explicit configured path is used as-is.
+  The legacy `%LOCALAPPDATA%\OpenCode` override is removed.
+- A missing binary or an unsupported major version now fails fast with an
+  actionable error instead of `PTY code=1`.
+- Webview terminal: Nerd Font fallbacks in the font stack, Unicode 11 width
+  tables (`@xterm/addon-unicode11`), and the real viewport size is reported
+  once the server is up (fixes the TUI squeezed into 80x24 with black area
+  below).
+
 ## [1.5.10] — 2026-07-05
 
 ### Changed
