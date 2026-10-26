@@ -1,7 +1,6 @@
 import { ChildProcess, spawn, execSync, execFileSync } from "child_process";
 import { randomBytes } from "crypto";
 import { createServer } from "net";
-import { get } from "http";
 import { existsSync, readFileSync } from "fs";
 import { OpenCodeClient } from "./httpClient";
 import * as path from "path";
@@ -153,36 +152,29 @@ export class OpenCodeServerManager {
     }
   }
 
+  /**
+   * v2-only flow: headless `serve --port N` (own child process,
+   * password-secured API) + TUI in the PTY attached via `--server <url>`.
+   * The same generated OPENCODE_SERVER_PASSWORD is shared by both processes
+   * and the API client. OpenCode v1 is no longer supported.
+   */
   async start(openCodePath: string, preferredPort?: number, cwd?: string): Promise<void> {
     if (this.helper_) return;
     this.port_ = preferredPort && preferredPort > 0 ? preferredPort : await findFreePort();
     this.cwd_ = cwd ?? process.cwd();
-    const ocPath = resolveOcPath(openCodePath);
-    const major = detectMajorVersion(ocPath);
-    if (major === 2) return this.startV2(ocPath);
-    return this.startV1(ocPath, cwd);
-  }
-
-  /**
-   * v1 flow: single `opencode --port N` process hosts both the TUI (in the
-   * PTY) and the open REST API. Unchanged legacy behavior.
-   */
-  private async startV1(ocPath: string, cwd?: string): Promise<void> {
-    const spawnMsg: Record<string, unknown> = { type: "spawn", path: ocPath, port: this.port_ };
-    if (cwd) spawnMsg.cwd = cwd;
-    if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
-    return this.spawnTuiPty(ocPath, spawnMsg, "Starting PTY (v1)", true);
-  }
-
-  /**
-   * v2 flow: headless `serve --port N` (own child process, password-secured
-   * API) + TUI in the PTY attached via `--server <url>`. The same generated
-   * OPENCODE_SERVER_PASSWORD is shared by both processes and the API client.
-   */
-  private async startV2(ocPath: string): Promise<void> {
     // serve runs via plain child_process.spawn (no shell, no PTY), so it
     // needs the direct .exe rather than a .cmd shim.
-    const exe = toDirectExecutable(ocPath);
+    const exe = toDirectExecutable(resolveOcPath(openCodePath));
+    const major = detectMajorVersion(exe);
+    if (major !== 2) {
+      throw new Error(
+        `Unsupported opencode major version ${major}: this extension requires OpenCode v2.x.`
+      );
+    }
+    return this.startServe(exe);
+  }
+
+  private async startServe(exe: string): Promise<void> {
     const password = randomBytes(24).toString("hex");
     this.password_ = password;
     const base = `http://127.0.0.1:${this.port_}`;
@@ -209,7 +201,7 @@ export class OpenCodeServerManager {
       }
     });
 
-    this.client_ = new OpenCodeClient(base, { password, v2: true });
+    this.client_ = new OpenCodeClient(base, { password });
     await this.pollInfo(30000);
 
     const spawnMsg: Record<string, unknown> = {
@@ -220,7 +212,7 @@ export class OpenCodeServerManager {
       password,
     };
     if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
-    return this.spawnTuiPty(ocPath, spawnMsg, "Starting TUI (v2)", false);
+    return this.spawnTuiPty(exe, spawnMsg, "Starting TUI");
   }
 
   /** Wait until the v2 serve API answers (or the serve process dies). */
@@ -249,15 +241,14 @@ export class OpenCodeServerManager {
   }
 
   /**
-   * Spawn the TUI inside the node-pty helper. v1 waits for the legacy
-   * /global/health poll; v2 resolves once the PTY reports the child pid
-   * (the serve API was already proven healthy before attaching the TUI).
+   * Spawn the TUI inside the node-pty helper. Resolves once the PTY reports
+   * the child pid (the serve API was already proven healthy before attaching
+   * the TUI).
    */
   private spawnTuiPty(
     ocPath: string,
     spawnMsg: Record<string, unknown>,
-    spawnLabel: string,
-    waitForHttpHealth: boolean
+    spawnLabel: string
   ): Promise<void> {
     const helperPath = path.resolve(__dirname, "ptyHelper.js");
     const nodeExe = findNode();
@@ -313,10 +304,7 @@ export class OpenCodeServerManager {
 
           if (prefix === "R") {
             try { const m = JSON.parse(payload); log(`PTY pid=${m.pid}`); } catch { /* */ }
-            if (!settled) {
-              if (waitForHttpHealth) pollHealth();
-              else done();
-            }
+            if (!settled) done();
           }
           else           if (prefix === "D") {
             if (this.stdoutCallback_) this.stdoutCallback_(payload);
@@ -333,37 +321,10 @@ export class OpenCodeServerManager {
       });
 
       this.helper_.stdin?.write(JSON.stringify(spawnMsg) + "\n");
-
-      const pollHealth = () => {
-        const base = `http://localhost:${this.port_}`;
-        const t0 = Date.now();
-        const timeout = 30000;
-        const poll = () => {
-          if (settled) return;
-          get(`${base}/global/health`, (res) => {
-            let body = "";
-            res.on("data", (c: Buffer) => { body += c.toString(); });
-            res.on("end", () => {
-              if (settled) return;
-              try {
-                const s = JSON.parse(body) as { healthy: boolean; version: string };
-                if (s.healthy) { this.client_ = new OpenCodeClient(base); done(); }
-                else setTimeout(poll, 1000);
-              } catch { setTimeout(poll, 1000); }
-            });
-          }).on("error", () => {
-            if (Date.now() - t0 > timeout) done(new Error("Timeout"));
-            else setTimeout(poll, 1000);
-          }).setTimeout(3000, function(this: any) { this.destroy(); });
-        };
-        setTimeout(poll, 1500);
-      };
     });
   }
 
   async stop(): Promise<void> {
-    if (this.client_) { try { await this.client_.executeTuiCommand("app_exit"); } catch { /* */ } }
-
     if (this.helper_) {
       const helper = this.helper_;
       helper.stdin?.write('{"type":"kill"}\n');

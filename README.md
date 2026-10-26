@@ -6,11 +6,11 @@
 
 Embed [OpenCode](https://opencode.ai) TUI directly in VS Code as a webview panel with proper keyboard handling for **all keyboard layouts** (Cyrillic, Korean, Japanese, etc.).
 
-Supports both OpenCode **v1.x** and **v2.x** CLIs — the major version is auto-detected and the matching launch flow is used.
+Requires the OpenCode **v2.x** CLI (v1 is no longer supported).
 
 ## Features
 
-- **OpenCode v1 + v2** — auto-detects the CLI major version: v1 runs as a single process, v2 as a headless `serve` plus an attached TUI
+- **OpenCode v2** — headless `serve` plus an attached TUI in the panel
 - **Full TUI in VS Code** — OpenCode terminal as a sidebar view or tab, each with its own server instance
 - **Toggle focus** — `Ctrl+Shift+'` switches between the editor and OpenCode panel (customizable in VS Code keybindings)
 - **Leader key support** — Ctrl+X (physical Ctrl position) activates leader mode regardless of layout
@@ -34,7 +34,7 @@ Supports both OpenCode **v1.x** and **v2.x** CLIs — the major version is auto-
   - `@xterm/addon-fit` `^0.10.0` — auto-fit terminal to container
   - `@xterm/addon-unicode11` `^0.8.0` — Unicode 11 width tables for the renderer
   - `@modelcontextprotocol/sdk` `^1.29.0` — MCP server for IDE context
-- **OpenCode CLI** — v1.x or v2.x, resolved via `PATH` by default (`"opencode"`)
+- **OpenCode CLI** — v2.x, resolved via `PATH` by default (`"opencode"`)
   or via the `opencode-tui-unofficial.opencodePath` setting. An explicit path is
   used as-is; a missing binary fails with an error. Windows `.cmd` shims are
   resolved to the underlying `.exe`.

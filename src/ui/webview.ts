@@ -40,6 +40,10 @@ const el = document.getElementById("terminal")!;
 term.open(el);
 term.attachCustomKeyEventHandler((e) => {
   if (e.type === "keydown" && e.ctrlKey && e.code === "KeyA" && __CTRL_A_SELECT_ALL__) return false;
+  // Paste once: let the browser fire a single `paste` event (handled below)
+  // instead of xterm emitting \x16. Otherwise Ctrl+V pastes twice — once via
+  // onData \x16 → `clipboardPaste`, once via the `paste` event → `textInput`.
+  if (e.type === "keydown" && (e.ctrlKey || e.metaKey) && e.code === "KeyV") return false;
   return true;
 });
 fitAddon.fit();

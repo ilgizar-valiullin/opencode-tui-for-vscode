@@ -219,11 +219,7 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       server.resizePty(m.cols, m.rows);
     }
     if (msg.type === "selectAll") {
-      try {
-        if (server.client) {
-          await server.client.executeTuiCommand("input_select_all");
-        }
-      } catch { /* fallback: send super+a CSI u sequence via stdin */ }
+      // The TUI selects all input on the Super+A key sequence.
       server.writeToStdin("\x1b[97;9u");
     }
     if (msg.type === "textInput") {

@@ -1,24 +1,22 @@
 import { request as httpRequest } from "http";
-import { ServerStatus, SessionInfo, TuiCommandId } from "./types";
+import { ServerStatus, SessionInfo } from "./types";
 
 export interface OpenCodeClientOptions {
-  /** HTTP Basic-auth password (v2 `serve` requires it; v1 server has no auth) */
+  /** HTTP Basic-auth password printed by `opencode serve` on startup */
   password?: string;
-  /** v2 API: prefix paths with /api and unwrap {"data"} envelopes */
-  v2?: boolean;
 }
 
+/**
+ * Typed client for the OpenCode v2 HTTP API. All routes live under `/api`,
+ * require Basic auth (`opencode:<password>`), and wrap payloads in
+ * `{"data": ...}` envelopes (bare values like /api/info and /api/project
+ * pass through unchanged).
+ */
 export class OpenCodeClient {
   private password_?: string;
-  private v2_: boolean;
 
   constructor(private baseUrl: string, opts?: OpenCodeClientOptions) {
     this.password_ = opts?.password;
-    this.v2_ = opts?.v2 ?? false;
-  }
-
-  private fullPath(path: string): string {
-    return this.v2_ ? `/api${path}` : path;
   }
 
   private async request<T>(
@@ -26,7 +24,7 @@ export class OpenCodeClient {
     path: string,
     body?: unknown
   ): Promise<T> {
-    const fullPath = this.fullPath(path);
+    const fullPath = `/api${path}`;
     const url = new URL(fullPath, this.baseUrl);
     const bodyStr = body !== undefined ? JSON.stringify(body) : undefined;
 
@@ -55,10 +53,7 @@ export class OpenCodeClient {
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               try {
                 const parsed = JSON.parse(data);
-                // v2 wraps payloads in {"data": ...}; pass through when absent
-                // (e.g. /api/info, /api/project return bare values).
                 if (
-                  this.v2_ &&
                   parsed !== null &&
                   typeof parsed === "object" &&
                   "data" in parsed
@@ -96,12 +91,8 @@ export class OpenCodeClient {
   // ─── Health ───
 
   async health(): Promise<ServerStatus> {
-    if (this.v2_) {
-      // v2 has no /global/health; /api/info carries {version, ...} when up.
-      const info = await this.request<{ version: string }> ("GET", "/info");
-      return { healthy: true, version: info.version };
-    }
-    return this.request<ServerStatus>("GET", "/global/health");
+    const info = await this.request<{ version: string }>("GET", "/info");
+    return { healthy: true, version: info.version };
   }
 
   // ─── Sessions ───
@@ -144,28 +135,6 @@ export class OpenCodeClient {
       parts,
       ...opts,
     });
-  }
-
-  // ─── TUI Commands (v1 only — v2 has no /tui routes) ───
-
-  async executeTuiCommand(command: TuiCommandId): Promise<boolean> {
-    if (this.v2_) return false;
-    return this.request<boolean>("POST", "/tui/execute-command", { command });
-  }
-
-  async appendPrompt(text: string): Promise<boolean> {
-    if (this.v2_) return false;
-    return this.request<boolean>("POST", "/tui/append-prompt", { text });
-  }
-
-  async submitPrompt(): Promise<boolean> {
-    if (this.v2_) return false;
-    return this.request<boolean>("POST", "/tui/submit-prompt");
-  }
-
-  async clearPrompt(): Promise<boolean> {
-    if (this.v2_) return false;
-    return this.request<boolean>("POST", "/tui/clear-prompt");
   }
 
   // ─── File operations ───

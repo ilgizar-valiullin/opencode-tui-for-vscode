@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.0.0] — 2026-10-27
+
+### Removed
+
+- **OpenCode v1 support removed — migration to OpenCode v2.** The extension
+  is v2-only now and requires the OpenCode v2.x CLI. A v1.x binary fails fast
+  with `Unsupported opencode major version 1: this extension requires
+  OpenCode v2.x.` All v1 code paths are gone: the legacy `opencode --port`
+  single-process flow, the `/global/health` poll, and the `/tui/*` HTTP
+  commands (`execute-command`, `append-prompt`, `submit-prompt`,
+  `clear-prompt`). Select-all and shutdown now go through stdin/PTY only.
+
 ## [2.0.0] — 2026-10-27
 
 ### Added
