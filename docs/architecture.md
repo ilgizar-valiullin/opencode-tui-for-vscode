@@ -154,10 +154,16 @@ The status bar is part of the webview HTML, not the VS Code status bar API. A se
 An embedded MCP server provides IDE context awareness:
 
 - **Resource**: `editor://context` — current active file path and text selection
-- **Auth**: Bearer token stored in a `.lock` file at `$dataDir/opencode/ide/{port}.lock`
-- **Transport**: Streamable HTTP on `127.0.0.1:random`
-- **Notifications**: Resource updated on editor change (debounced 150ms)
-- **Lifecycle**: MCP server is shared; both sidebar and tab PTY helpers receive `mcpPort` in spawn message
+- **WebSocket bridge**: Claude-IDE-compatible `selection_changed` push on the
+  same port — opencode's TUI discovers it via `~/.claude/ide/*.lock`
+  (or `OPENCODE_EDITOR_SSE_PORT`) and attaches the selection to every prompt
+  automatically; coordinates are 1-based
+- **Auth**: Bearer token stored in a `.lock` file at `~/.claude/ide/{port}.lock`
+  (`transport: "ws"`); WebSocket accepts the `x-claude-code-ide-authorization`
+  header or no credentials on localhost
+- **Transport**: Streamable HTTP + WebSocket upgrade on `127.0.0.1:random`
+- **Notifications**: Selection pushed on editor/selection change (debounced 150ms)
+- **Lifecycle**: MCP server is shared; both sidebar and tab PTY helpers receive `mcpPort` and `editorPort` (`OPENCODE_EDITOR_SSE_PORT`) in the spawn message
 
 ## PTY Helper Protocol
 

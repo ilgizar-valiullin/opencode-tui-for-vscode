@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { readFileSync } from "fs";
+import { cpSync, existsSync, mkdirSync, readFileSync } from "fs";
 
 const isWatch = process.argv.includes("--watch");
 
@@ -63,8 +63,18 @@ const watchdogConfig = {
   },
 };
 
+function copyBridgePlugin() {
+  // Shipped unbundled: opencode loads the plugin dir from the extension host.
+  if (!existsSync("vscode-bridge-plugin")) {
+    return;
+  }
+  mkdirSync("dist/vscode-bridge-plugin", { recursive: true });
+  cpSync("vscode-bridge-plugin", "dist/vscode-bridge-plugin", { recursive: true });
+}
+
 async function main() {
   if (isWatch) {
+    copyBridgePlugin();
     const extCtx = await esbuild.context(extensionConfig);
     const webCtx = await esbuild.context(webviewConfig);
     const helperCtx = await esbuild.context(helperConfig);
@@ -79,6 +89,7 @@ async function main() {
     await esbuild.build(webviewConfig);
     await esbuild.build(helperConfig);
     await esbuild.build(watchdogConfig);
+    copyBridgePlugin();
     console.log("[opencode-tui] Build complete.");
   }
 }

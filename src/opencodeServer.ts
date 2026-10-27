@@ -18,6 +18,10 @@ export class OpenCodeServerManager {
   private client_: OpenCodeClient | null = null;
   private cwd_: string = "";
   private mcpPort_: number = 0;
+  private editorPort_: number = 0;
+  private bridgeUrl_: string = "";
+  private bridgeToken_: string = "";
+  private pluginDir_: string = "";
   private password_: string | null = null;
   private stdoutCallback_: ((data: string) => void) | null = null;
   private stdoutBuffer_: string[] = [];
@@ -126,6 +130,24 @@ export class OpenCodeServerManager {
   get mcpPort(): number { return this.mcpPort_; }
   setMcpPort(port: number): void { this.mcpPort_ = port; }
 
+  /**
+   * Port of the IDE WebSocket bridge (same HTTP server as MCP). Forwarded to
+   * the TUI via OPENCODE_EDITOR_SSE_PORT so opencode discovers the IDE even
+   * without scanning `~/.claude/ide/*.lock`. Applied on next start().
+   */
+  setEditorPort(port: number): void { this.editorPort_ = port; }
+
+  /**
+   * VS Code diagnostics bridge: same HTTP server as MCP (same port),
+   * plus the bundled opencode plugin directory injected via env.
+   * Applied on next start() — call before start.
+   */
+  setIdeBridge(url: string, token: string, pluginDir: string): void {
+    this.bridgeUrl_ = url;
+    this.bridgeToken_ = token;
+    this.pluginDir_ = pluginDir;
+  }
+
   get client(): OpenCodeClient | null { return this.client_; }
   get port(): number { return this.port_; }
   get cwd(): string { return this.cwd_; }
@@ -188,6 +210,10 @@ export class OpenCodeServerManager {
         ...process.env,
         OPENCODE_SERVER_PASSWORD: password,
         ...(this.mcpPort_ ? { OPENCODE_MCP_PORT: String(this.mcpPort_) } : {}),
+        ...(this.editorPort_ ? { OPENCODE_EDITOR_SSE_PORT: String(this.editorPort_) } : {}),
+        ...(this.bridgeUrl_ ? { OPENCODE_VSCODE_BRIDGE_URL: this.bridgeUrl_ } : {}),
+        ...(this.bridgeToken_ ? { OPENCODE_VSCODE_BRIDGE_TOKEN: this.bridgeToken_ } : {}),
+        ...extraPluginEnv(process.env.OPENCODE_CONFIG_CONTENT, this.pluginDir_),
       },
     });
     this.serve_ = serve;
@@ -212,6 +238,7 @@ export class OpenCodeServerManager {
       password,
     };
     if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
+    if (this.editorPort_) spawnMsg.editorPort = this.editorPort_;
     return this.spawnTuiPty(exe, spawnMsg, "Starting TUI");
   }
 
@@ -526,4 +553,28 @@ function findFreePort(): Promise<number> {
     });
     s.on("error", reject);
   });
+}
+
+/**
+ * Merge the bundled VS Code bridge plugin into inline opencode config.
+ * Plugin arrays merge across config sources, so user plugins are preserved.
+ */
+function extraPluginEnv(
+  existing: string | undefined,
+  pluginDir: string,
+): Record<string, string> {
+  if (!pluginDir) {
+    return {};
+  }
+  try {
+    const parsed = existing ? (JSON.parse(existing) as { plugins?: unknown }) : {};
+    const prev = Array.isArray(parsed.plugins) ? (parsed.plugins as unknown[]) : [];
+    const next = [...prev];
+    if (!next.includes(pluginDir)) {
+      next.push(pluginDir);
+    }
+    return { OPENCODE_CONFIG_CONTENT: JSON.stringify({ ...parsed, plugins: next }) };
+  } catch {
+    return { OPENCODE_CONFIG_CONTENT: JSON.stringify({ plugins: [pluginDir] }) };
+  }
 }

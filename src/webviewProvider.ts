@@ -68,6 +68,10 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
   private tabServerStarted_ = false;
   private webviewFocused_ = false;
   private mcpPort_ = 0;
+  private editorPort_ = 0;
+  private bridgeUrl_ = "";
+  private bridgeToken_ = "";
+  private pluginDir_ = "";
   private mcpDisconnectCallback_: (() => void) | null = null;
 
   constructor(extensionUri: vscode.Uri) {
@@ -75,7 +79,24 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   setMcpPort(port: number): void { this.mcpPort_ = port; }
+  setEditorPort(port: number): void { this.editorPort_ = port; }
   setMcpDisconnectCallback(cb: () => void): void { this.mcpDisconnectCallback_ = cb; }
+
+  setIdeBridge(url: string, token: string, pluginDir: string): void {
+    this.bridgeUrl_ = url;
+    this.bridgeToken_ = token;
+    this.pluginDir_ = pluginDir;
+    for (const s of [this.sidebarServer_, this.tabServer_]) {
+      s?.setIdeBridge(url, token, pluginDir);
+    }
+  }
+
+  private configureServer(s: OpenCodeServerManager): void {
+    if (this.mcpPort_) s.setMcpPort(this.mcpPort_);
+    if (this.editorPort_) s.setEditorPort(this.editorPort_);
+    if (this.bridgeUrl_ || this.pluginDir_) s.setIdeBridge(this.bridgeUrl_, this.bridgeToken_, this.pluginDir_);
+    if (this.mcpDisconnectCallback_) s.onMcpClientDisconnect(this.mcpDisconnectCallback_);
+  }
 
   getActiveServer(): OpenCodeServerManager | null {
     return this.activeServer_ ?? this.sidebarServer_;
@@ -135,13 +156,11 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       if (isSidebar) {
         this.sidebarServerStarted_ = true;
         this.sidebarServer_ = new OpenCodeServerManager();
-        if (this.mcpPort_) this.sidebarServer_.setMcpPort(this.mcpPort_);
-        if (this.mcpDisconnectCallback_) this.sidebarServer_.onMcpClientDisconnect(this.mcpDisconnectCallback_);
+        this.configureServer(this.sidebarServer_);
       } else {
         this.tabServerStarted_ = true;
         this.tabServer_ = new OpenCodeServerManager();
-        if (this.mcpPort_) this.tabServer_.setMcpPort(this.mcpPort_);
-        if (this.mcpDisconnectCallback_) this.tabServer_.onMcpClientDisconnect(this.mcpDisconnectCallback_);
+        this.configureServer(this.tabServer_);
       }
 
       const server = isSidebar ? this.sidebarServer_ : this.tabServer_;

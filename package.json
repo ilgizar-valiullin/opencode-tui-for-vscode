@@ -2,7 +2,7 @@
   "name": "opencode-tui-for-vscode",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "publisher": "opencode-tui-unofficial",
   "license": "MIT",
   "repository": {
@@ -172,6 +172,7 @@
   "devDependencies": {
     "@types/node": "^26.0.1",
     "@types/vscode": "^1.84.0",
+    "@types/ws": "^8.18.2",
     "@typescript-eslint/eslint-plugin": "^8.62.1",
     "@typescript-eslint/parser": "^8.62.1",
     "@vscode/vsce": "^3.0.0",
@@ -185,6 +186,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-unicode11": "^0.8.0",
-    "node-pty": "^1.1.0"
+    "node-pty": "^1.1.0",
+    "ws": "^8.22.0"
   }
 }

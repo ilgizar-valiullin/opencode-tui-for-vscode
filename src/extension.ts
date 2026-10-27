@@ -9,16 +9,6 @@ import { attachFile, attachSelection } from "./commands/attachFile";
 import { createMcpServer } from "./mcp-server";
 import { vscodeEditorState } from "./vscode-editor-state";
 
-function findDataDir(): string {
-  if (process.platform === "win32" && process.env.APPDATA) {
-    return process.env.APPDATA;
-  }
-  if (process.env.XDG_DATA_HOME) {
-    return process.env.XDG_DATA_HOME;
-  }
-  return path.join(os.homedir(), ".local", "share");
-}
-
 let provider: OpenCodeWebviewProvider | null = null;
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -83,21 +73,36 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const mcpHandle = await createMcpServer(vscodeEditorState, version, authToken);
 
-    const ideDir = path.join(findDataDir(), "opencode", "ide");
-    fs.mkdirSync(ideDir, { recursive: true });
-    const lockFilePath = path.join(ideDir, `${mcpHandle.port}.lock`);
+    // opencode's TUI discovers the IDE via `~/.claude/ide/*.lock`
+    // (see `discoverEditorConnection` in opencode) and connects over
+    // WebSocket; without this file the selection is never shared.
+    const claudeIdeDir = path.join(os.homedir(), ".claude", "ide");
+    fs.mkdirSync(claudeIdeDir, { recursive: true });
+    const lockFilePath = path.join(claudeIdeDir, `${mcpHandle.port}.lock`);
 
     const lockContent = JSON.stringify({
       pid: process.pid,
       workspaceFolders: (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
       authToken,
+      transport: "ws",
     });
     const tmpPath = lockFilePath + ".tmp";
     fs.writeFileSync(tmpPath, lockContent, { mode: 0o600 });
     fs.renameSync(tmpPath, lockFilePath);
 
     provider.setMcpPort(mcpHandle.port);
+    provider.setEditorPort(mcpHandle.port);
     provider.setMcpDisconnectCallback(() => mcpHandle.sessionsClose().catch(() => {}));
+
+    // VS Code diagnostics bridge + bundled opencode plugin (no repo pollution:
+    // injected via env, see OpenCodeServerManager.setIdeBridge).
+    const bridgePluginDir = path.join(__dirname, "vscode-bridge-plugin");
+    if (fs.existsSync(bridgePluginDir)) {
+      provider.setIdeBridge(`http://127.0.0.1:${mcpHandle.port}`, authToken, bridgePluginDir);
+    } else {
+      console.warn(`[opencode] bridge plugin missing at ${bridgePluginDir}, diagnostics tool disabled`);
+      provider.setIdeBridge(`http://127.0.0.1:${mcpHandle.port}`, authToken, "");
+    }
 
     const EDITOR_NOTIFY_DEBOUNCE_MS = 150;
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;

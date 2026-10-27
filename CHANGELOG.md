@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.3.0] — 2026-10-28
+
+### Added
+
+- **VS Code diagnostics bridge** — live Problems from all VS Code providers
+  (tsc, ESLint, Dart-Code, built-ins) served per file via
+  `GET /diagnostics` on the existing extension-host HTTP server (same port +
+  Bearer auth, no extra processes). Supports `waitMs`/`freshAfter` long-poll
+  for fresh analyzer pushes and `isDirty`/`version` dirty-buffer awareness.
+- **Bundled `vscode_diagnostics` OpenCode plugin** — injected via
+  `OPENCODE_CONFIG_CONTENT` without touching the repo, plus an
+  `execute.after` hook that auto-attaches new errors/warnings to every
+  `write`/`edit` result (deduped per file, `clean` marker when clear).
+- **IDE selection bridge** — Claude-IDE-compatible WebSocket pushes
+  `selection_changed` (1-based) so OpenCode attaches the selection to every
+  prompt automatically; forwarded via `OPENCODE_EDITOR_SSE_PORT`.
+
+### Fixed
+
+- IDE discovery: lock file moved to `~/.claude/ide/*.lock` with
+  `transport: "ws"` — without it opencode's TUI never found the IDE and the
+  selection was never shared.
+- Collapsed cursor is now reported as an opened file (empty text) instead of
+  dropping the selection entirely.
+
 ## [2.2.0] — 2026-10-27
 
 ### Added

@@ -8,7 +8,8 @@
  *         v1 TUI: args default to ["--port", port]
  *     → {"type":"spawn","path":"opencode","args":["--server","http://127.0.0.1:1234"]}
  *         v2 TUI: explicit argv (port optional); optional "password" sets
- *         OPENCODE_SERVER_PASSWORD for the child, "cwd"/"mcpPort" as before
+ *         OPENCODE_SERVER_PASSWORD for the child, "cwd"/"mcpPort"/"editorPort"
+ *         as before ("editorPort" becomes OPENCODE_EDITOR_SSE_PORT)
  *     → {"type":"stdin","data":"text\n"}
  *     → {"type":"resize","cols":N,"rows":M}
  *     → {"type":"kill"}
@@ -68,6 +69,9 @@ rl.on("line", (line: string) => {
 
     const mcpPort = (msg as any).mcpPort;
     if (mcpPort) env.OPENCODE_MCP_PORT = String(mcpPort);
+
+    const editorPort = (msg as any).editorPort;
+    if (editorPort) env.OPENCODE_EDITOR_SSE_PORT = String(editorPort);
 
     const childPassword = (msg as any).password;
     if (childPassword) env.OPENCODE_SERVER_PASSWORD = String(childPassword);

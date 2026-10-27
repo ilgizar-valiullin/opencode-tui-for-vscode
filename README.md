@@ -16,6 +16,8 @@ Requires the OpenCode **v2.x** CLI (v1 is no longer supported).
 - **Leader key support** — Ctrl+X (physical Ctrl position) activates leader mode regardless of layout
 - **Attach files** — Right-click files or selections in VS Code to attach them to OpenCode context
 - **IDE context awareness** — MCP server exposes current editor state to OpenCode
+- **IDE selection bridge** — Claude-IDE-compatible WebSocket pushes `selection_changed` to OpenCode, which attaches the selection to every prompt automatically
+- **VS Code diagnostics bridge** — live Problems (all linters: tsc, ESLint, Dart-Code, built-ins) as an OpenCode tool, auto-attached to edit results; zero extra language servers (see [VS Code diagnostics bridge](#vs-code-diagnostics-bridge))
 - **Settings modal** — On-screen settings panel in the terminal (gear button in status bar)
 - **Localized** — UI translated to 10 languages (see [Localization](docs/localization.md))
 - **Future-proof** — designed to support future OpenCode versions as long as possible; minimal coupling to internal OpenCode APIs
@@ -95,6 +97,14 @@ The extension intercepts keyboard events at the `document` level using `event.co
 
 For full details, see [Keyboard Handling](docs/keyboard-handling.md).
 
+## VS Code diagnostics bridge
+
+OpenCode v2 runs no language servers of its own, so the extension feeds it the diagnostics VS Code already computed — no duplicated `dart analyze` / `tsc` / ESLint processes, dirty buffers included.
+
+- **HTTP bridge** — the extension host serves `GET /diagnostics?file=&waitMs=&freshAfter=&includeContent=` on the same `127.0.0.1` port and Bearer auth as the MCP server. Response per file: `severity/range/message/source/code` (0-based), `isDirty/version/mtimeMs`, `updatedAt/stale`; `freshAfter + waitMs` long-polls until the analyzer pushes fresh results.
+- **Bundled OpenCode plugin** (`vscode-bridge-plugin/`, injected via `OPENCODE_CONFIG_CONTENT` without touching the repo) provides the `vscode_diagnostics` tool.
+- **Automatic check** — an `execute.after` hook appends new errors/warnings to every `write/edit` result (deduped per file, `clean` marker when clear), so the agent sees problems without asking.
+
 ## Development
 
 ```bash
@@ -118,6 +128,10 @@ npx vsce package    # Build + package VSIX
 │   ├── httpClient.ts             # Typed REST client for OpenCode API
 │   ├── webviewProvider.ts        # Webview panel with xterm.js + settings modal
 │   ├── mcp-server.ts             # MCP server for IDE context
+│   │                               (+ /diagnostics + /health bridge routes,
+│   │                               Claude-IDE WebSocket selection push)
+│   ├── diagnosticsBridge.ts      # Per-file Problems snapshot + fresh-push wait
+│   ├── ideWs.ts                  # Claude-IDE-compatible selection_changed WS bridge
 │   ├── vscode-editor-state.ts    # Current editor state provider
 │   ├── commands/
 │   │   └── attachFile.ts         # Attach file/selection commands

@@ -3,6 +3,18 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import http from "http";
 import { randomUUID } from "crypto";
+import * as vscode from "vscode";
+import {
+  clampWaitMs,
+  createDiagnosticsTracker,
+  resolveFileParam,
+  snapshotForFile,
+} from "./diagnosticsBridge";
+import {
+  attachIdeWebSocket,
+  buildSelectionParams,
+  type IdeSelectionParams,
+} from "./ideWs";
 
 export interface EditorContext {
   uri?: string;
@@ -33,6 +45,30 @@ export async function createMcpServer(
   };
 
   const sessions = new Map<string, Session>();
+  const tracker = createDiagnosticsTracker();
+
+  // ─── Claude-IDE-compatible WebSocket bridge (selection_changed) ───
+  // opencode's TUI discovers `ws://127.0.0.1:<port>` via `~/.claude/ide/*.lock`
+  // (or OPENCODE_EDITOR_SSE_PORT) and expects 1-based coordinates.
+  function toIdeSelection(ctx: EditorContext): IdeSelectionParams | undefined {
+    if (!ctx.uri || !ctx.selection) return undefined;
+    let filePath: string;
+    try {
+      const uri = vscode.Uri.parse(ctx.uri);
+      if (uri.scheme !== "file") return undefined;
+      filePath = uri.fsPath;
+    } catch {
+      return undefined;
+    }
+    return buildSelectionParams({
+      filePath,
+      startLine: ctx.selection.start.line,
+      startCharacter: ctx.selection.start.column,
+      endLine: ctx.selection.end.line,
+      endCharacter: ctx.selection.end.column,
+      text: ctx.selection.text,
+    });
+  }
 
   function createSessionServer(): McpServer {
     const mcp = new McpServer(
@@ -74,8 +110,44 @@ export async function createMcpServer(
         return;
       }
 
-      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+      // ─── VS Code diagnostics bridge (same port + auth, no MCP overhead) ───
+      const rawUrl = req.url ?? "/";
+      const url = new URL(rawUrl, "http://127.0.0.1");
       const method = req.method?.toUpperCase();
+
+      if (method === "GET" && url.pathname === "/health") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+
+      if (method === "GET" && url.pathname === "/diagnostics") {
+        const resolved = resolveFileParam(url.searchParams.get("file"), vscode.workspace.workspaceFolders);
+        if ("error" in resolved) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: resolved.error }));
+          return;
+        }
+        const waitMs = clampWaitMs(url.searchParams.get("waitMs"));
+        const freshAfter = Number(url.searchParams.get("freshAfter")) || 0;
+        const includeParam = url.searchParams.get("includeContent") ?? "";
+        const includeContent = /^(1|true|yes)$/i.test(includeParam);
+        let updatedAt = tracker.updatedAtFor(resolved.fsPath);
+        if (freshAfter > 0 && waitMs > 0 && updatedAt <= freshAfter) {
+          await tracker.waitForUpdate(resolved.fsPath, freshAfter, waitMs);
+          updatedAt = tracker.updatedAtFor(resolved.fsPath);
+        }
+        const snap = snapshotForFile(resolved.fsPath, resolved.uri, {
+          includeContent,
+          updatedAt,
+          freshAfter,
+        });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(snap));
+        return;
+      }
+
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
       if (method === "POST") {
         if (sessionId && sessions.has(sessionId)) {
@@ -125,6 +197,19 @@ export async function createMcpServer(
     httpServer.once("error", reject);
   });
 
+  const ide = attachIdeWebSocket({
+    server: httpServer,
+    authToken,
+    version,
+    getSelection: () => {
+      try {
+        return toIdeSelection(editorState());
+      } catch {
+        return undefined;
+      }
+    },
+  });
+
   const address = httpServer.address();
   const port = address && typeof address === "object" ? address.port : 0;
 
@@ -140,6 +225,7 @@ export async function createMcpServer(
   return {
     port,
     async notifyContextChanged() {
+      ide.broadcast();
       const promises: Promise<void>[] = [];
       for (const [id, session] of sessions) {
         promises.push(
@@ -160,6 +246,8 @@ export async function createMcpServer(
     },
     async close() {
       clearInterval(cleanupInterval);
+      tracker.dispose();
+      ide.dispose();
       const promises: Promise<void>[] = [];
       for (const [, session] of sessions) {
         promises.push(session.server.close().catch(() => {}));
