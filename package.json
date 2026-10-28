@@ -2,7 +2,7 @@
   "name": "opencode-tui-for-vscode",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "publisher": "opencode-tui-unofficial",
   "license": "MIT",
   "repository": {

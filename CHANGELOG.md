@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.4.0] — 2026-10-28
+
+### Added
+
+- **Server-mode toggle** — `opencode-tui-unofficial.serverMode`: `embedded`
+  (default, private in-process server over stdio), `separate` (headless
+  `serve` plus an attached TUI), `external` (attach to a user-launched
+  `serve`; address + optional password from settings, persist across
+  sessions). Switchable in VS Code Settings and in the panel gear menu;
+  the statusbar shows `host:port` per mode.
+- **Settings fixes** — address/password fields appear only for `external`;
+  paste and Ctrl+A inside the settings panel no longer leak into the TUI.
+
 ## [2.3.0] — 2026-10-28
 
 ### Added
