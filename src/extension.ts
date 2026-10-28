@@ -8,8 +8,11 @@ import { OpenCodeServerManager } from "./opencodeServer";
 import { attachFile, attachSelection } from "./commands/attachFile";
 import { createMcpServer } from "./mcp-server";
 import { vscodeEditorState } from "./vscode-editor-state";
+import type { IdeMentionParams } from "./ideWs";
 
 let provider: OpenCodeWebviewProvider | null = null;
+/** v2-native file attach, set once the MCP/IDE bridge is up (null until then). */
+let mcpMention: ((params: IdeMentionParams) => void) | null = null;
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log("[opencode] activate start");
@@ -50,7 +53,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("opencode-tui-unofficial.toggleFocus", () => provider!.toggleFocus()),
     vscode.commands.registerCommand("opencode-tui-unofficial.stopServer", () => { provider!.stopAllServers().catch(() => {}); }),
     vscode.commands.registerCommand("opencode-tui-unofficial.attachFile", (uri: vscode.Uri) => { const s = provider!.getActiveServer(); if (s) attachFile(uri, s).catch(() => {}); }),
-    vscode.commands.registerCommand("opencode-tui-unofficial.attachFileContext", () => { const s = provider!.getActiveServer(); if (s) attachSelection(s).catch(() => {}); }),
+    vscode.commands.registerCommand("opencode-tui-unofficial.attachFileContext", () => { const s = provider!.getActiveServer(); if (s) attachSelection(s, mcpMention).catch(() => {}); }),
     vscode.commands.registerCommand("opencode-tui-unofficial.handlePaste", async () => {
       try {
         const text = await vscode.env.clipboard.readText();
@@ -72,6 +75,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const version = context.extension.packageJSON.version ?? "0.0.0";
 
     const mcpHandle = await createMcpServer(vscodeEditorState, version, authToken);
+    mcpMention = (params) => { mcpHandle.mention(params); };
 
     // opencode's TUI discovers the IDE via `~/.claude/ide/*.lock`
     // (see `discoverEditorConnection` in opencode) and connects over

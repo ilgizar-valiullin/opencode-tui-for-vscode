@@ -1,6 +1,14 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { OpenCodeServerManager } from "../opencodeServer";
+import type { IdeMentionParams } from "../ideWs";
+
+/**
+ * v2-native file attach: IDE WebSocket `at_mentioned`. Inserts a structured
+ * attachment into the TUI prompt draft — no typing races, no focus tricks.
+ * Broadcast to every TUI connected to the IDE bridge (same as selection).
+ */
+export type MentionFn = (params: IdeMentionParams) => void;
 
 const ENTER_DELAY_MS = 150;
 
@@ -21,7 +29,9 @@ async function typeAndSubmit(server: OpenCodeServerManager, text: string): Promi
 }
 
 async function pasteInPlace(server: OpenCodeServerManager, text: string): Promise<void> {
-  server.writeToStdin(`\x1b[200~${text}\x1b[201~\n`);
+  // Full (absolute) path: insert only, no Enter — the user confirms manually.
+  // Trailing space separates the path from whatever the user types next.
+  server.writeToStdin(`\x1b[200~${text}\x1b[201~ `);
 }
 
 async function getRelativePath(server: OpenCodeServerManager, filePath: string): Promise<string | null> {
@@ -50,10 +60,13 @@ export async function attachFile(uri: vscode.Uri, server: OpenCodeServerManager)
   }
   const rel = await getRelativePath(server, absPath);
   if (rel === null) return;
+  // Workspace file: `@rel` + Enter (auto-confirm the picker). A whole file
+  // cannot go through `at_mentioned`: the TUI always sets `?start=N`
+  // (upstream anomalyco/opencode#58033), i.e. N..EOF, never the whole file.
   await typeAndSubmit(server, `@${rel}`);
 }
 
-export async function attachSelection(server: OpenCodeServerManager): Promise<void> {
+export async function attachSelection(server: OpenCodeServerManager, mention?: MentionFn | null): Promise<void> {
   if (!server.isRunning()) {
     vscode.window.showErrorMessage("OpenCode server is not running");
     return;
@@ -66,35 +79,26 @@ export async function attachSelection(server: OpenCodeServerManager): Promise<vo
   const document = editor.document;
   const sel = editor.selection;
   const filePath = document.uri.fsPath;
-  const rel = await getRelativePath(server, filePath);
-  if (rel === null) return;
-
-  if (sel.isEmpty) {
-    await typeAndSubmit(server, `@${rel}`);
-    return;
-  }
 
   const startLine = sel.start.line + 1;
   let endLine = sel.end.line + 1;
-  let lastLineIndex = sel.end.line;
   if (sel.end.character === 0 && sel.end.line > sel.start.line) {
-    lastLineIndex--;
     endLine--;
   }
-  const fullRange = new vscode.Range(
-    sel.start.line, 0,
-    lastLineIndex, document.lineAt(lastLineIndex).text.length,
-  );
-  const selectedText = document.getText(fullRange);
-  const languageId = document.languageId;
 
-  const formatted = [
-    `file:${rel} (lines ${startLine}-${endLine})`,
-    `\`\`\`${languageId}`,
-    selectedText,
-    "```",
-    "",
-  ].join("\n");
+  if (!sel.isEmpty && endLine > startLine && mention) {
+    // v2-native: structured range attachment, no PTY races. Lines are 1-based.
+    mention({ filePath, lineStart: startLine, lineEnd: endLine });
+    return;
+  }
 
-  server.writeToStdin(`\x1b[200~${formatted}\x1b[201~`);
+  const rel = await getRelativePath(server, filePath);
+  if (rel === null) return;
+
+  // Workspace file: `@rel` / `@rel#Lline` + Enter (auto-confirm the picker).
+  // Single-line selections and collapsed cursors cannot go through
+  // `at_mentioned`: upstream drops `end` when it equals `start` (N..EOF,
+  // anomalyco/opencode#58033).
+  const ref = sel.isEmpty ? `@${rel}` : `@${rel}#L${startLine}`;
+  await typeAndSubmit(server, ref);
 }
