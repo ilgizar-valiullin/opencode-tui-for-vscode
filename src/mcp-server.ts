@@ -13,6 +13,7 @@ import {
 import {
   attachIdeWebSocket,
   buildSelectionParams,
+  type IdeMentionParams,
   type IdeSelectionParams,
 } from "./ideWs";
 
@@ -30,6 +31,8 @@ export type EditorState = () => EditorContext;
 export interface McpServerHandle {
   port: number;
   notifyContextChanged(): Promise<void>;
+  /** v2-native file attach: IDE WebSocket `at_mentioned` (structured attachment in the TUI prompt draft). */
+  mention(params: IdeMentionParams): void;
   sessionsClose(): Promise<void>;
   close(): Promise<void>;
 }
@@ -235,6 +238,9 @@ export async function createMcpServer(
         );
       }
       await Promise.allSettled(promises);
+    },
+    mention(params: IdeMentionParams) {
+      ide.mention(params);
     },
     async sessionsClose() {
       const promises: Promise<void>[] = [];
