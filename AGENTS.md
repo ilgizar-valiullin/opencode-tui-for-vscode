@@ -13,9 +13,13 @@ VS Code Webview Panel
 │
 Extension Host (Node.js) — mode from `opencode-tui-unofficial.serverMode`
 ├── embedded (default): `opencode --standalone` in node-pty (one process
-│   per view, private in-process server, readiness = PTY pid ack)
+│   per view, private in-process server over stdio — no TCP address,
+│   readiness = PTY pid ack)
 ├── separate: headless `serve --port N` + TUI attached via `--server`
 │   (two processes per view, password-secured API, readiness = health poll)
+├── external: TUI attached via `--server` to a user-launched server
+│   (address + optional password from settings, persist across sessions;
+│   extra memory — server lives outside VS Code)
 ├── IDE bridges (MCP/WS + diagnostics) env-forwarded into the TUI child
 └── Watchdog + startup orphan cleanup (name-based, unchanged)
 ```

@@ -126,9 +126,19 @@
         },
         "opencode-tui-unofficial.serverMode": {
           "type": "string",
-          "enum": ["embedded", "separate"],
+          "enum": ["embedded", "separate", "external"],
           "default": "embedded",
           "description": "%cfg.serverMode.desc%"
+        },
+        "opencode-tui-unofficial.serverAddress": {
+          "type": "string",
+          "default": "",
+          "description": "%cfg.serverAddress.desc%"
+        },
+        "opencode-tui-unofficial.serverPassword": {
+          "type": "string",
+          "default": "",
+          "description": "%cfg.serverPassword.desc%"
         },
         "opencode-tui-unofficial.leaderChords": {
           "type": "array",

@@ -25,6 +25,7 @@ export class OpenCodeServerManager {
   private bridgeToken_: string = "";
   private pluginDir_: string = "";
   private password_: string | null = null;
+  private address_: string = "";
   private stdoutCallback_: ((data: string) => void) | null = null;
   private stdoutBuffer_: string[] = [];
   private mcpDisconnectCallback_: (() => void) | null = null;
@@ -156,11 +157,45 @@ export class OpenCodeServerManager {
    * via `--server` (the pre-experiment flow). Applied on next start().
    */
   setServerMode(mode: ServerMode): void {
-    this.mode_ = mode === "separate" ? "separate" : "embedded";
+    this.mode_ = mode === "separate" || mode === "external" ? mode : "embedded";
+  }
+
+  /** Address of an externally launched server (external mode), e.g. http://127.0.0.1:4096. */
+  setServerAddress(address: string): void {
+    this.address_ = (address ?? "").trim();
+  }
+
+  /** Password of the external server (OPENCODE_SERVER_PASSWORD), empty = none. */
+  setServerPassword(password: string): void {
+    this.password_ = (password ?? "").trim() || null;
   }
 
   get client(): OpenCodeClient | null { return this.client_; }
-  get port(): number { return this.port_; }
+
+  /** Display host: parsed from the external address, "localhost" for separate, "embedded" otherwise. */
+  get host(): string {
+    if (this.mode_ === "external") {
+      try {
+        return new URL(this.address_).hostname || this.address_;
+      } catch {
+        return this.address_ || "external";
+      }
+    }
+    return this.mode_ === "separate" ? "localhost" : "embedded";
+  }
+
+  /** Display port: parsed from the external address, allocated port for separate, 0 for embedded. */
+  get port(): number {
+    if (this.mode_ === "external") {
+      try {
+        const p = new URL(this.address_).port;
+        return p ? parseInt(p, 10) : 0;
+      } catch {
+        return 0;
+      }
+    }
+    return this.port_;
+  }
   get cwd(): string { return this.cwd_; }
 
   onMcpClientDisconnect(cb: () => void): void {
@@ -191,7 +226,9 @@ export class OpenCodeServerManager {
    * lives inside the TUI process — no allocated port, no password plumbing,
    * readiness is the PTY spawn ack. Separate: headless `serve --port N`
    * (password-secured API) + TUI attached via `--server <url>`; readiness is
-   * the serve health probe. OpenCode v1 is no longer supported.
+   * the serve health probe. External: no spawned server at all — the TUI
+   * attaches to a user-launched server (address + optional password from
+   * settings). OpenCode v1 is no longer supported.
    */
   async start(openCodePath: string, preferredPort?: number, cwd?: string): Promise<void> {
     if (this.helper_) return;
@@ -205,11 +242,47 @@ export class OpenCodeServerManager {
         `Unsupported opencode major version ${major}: this extension requires OpenCode v2.x.`
       );
     }
+    if (this.mode_ === "external") {
+      return this.startExternal(exe);
+    }
     if (this.mode_ === "separate") {
       this.port_ = preferredPort && preferredPort > 0 ? preferredPort : await findFreePort();
       return this.startServe(exe);
     }
     return this.startEmbedded(exe);
+  }
+
+  /**
+   * External flow: attach the TUI to a server the user launched themselves
+   * (e.g. `opencode serve --port 4096`). Nothing is spawned except the TUI;
+   * auth goes through OPENCODE_SERVER_PASSWORD like in the separate flow.
+   */
+  private startExternal(exe: string): Promise<void> {
+    let address: URL;
+    try {
+      address = new URL(this.address_);
+    } catch {
+      throw new Error(
+        `External server mode needs opencode-tui-unofficial.serverAddress, e.g. http://127.0.0.1:4096 (got "${this.address_}").`
+      );
+    }
+    const base = address.toString().replace(/\/+$/, "");
+    log(`Attaching TUI to external server ${base}, oc=${exe}`);
+
+    const spawnMsg: Record<string, unknown> = {
+      type: "spawn",
+      path: exe,
+      args: ["--server", base],
+      cwd: this.cwd_,
+    };
+    if (this.password_) spawnMsg.password = this.password_;
+    if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
+    if (this.editorPort_) spawnMsg.editorPort = this.editorPort_;
+    if (this.bridgeUrl_) spawnMsg.bridgeUrl = this.bridgeUrl_;
+    if (this.bridgeToken_) spawnMsg.bridgeToken = this.bridgeToken_;
+    const extra = extraPluginEnv(process.env.OPENCODE_CONFIG_CONTENT, this.pluginDir_);
+    if (extra.OPENCODE_CONFIG_CONTENT) spawnMsg.configContent = extra.OPENCODE_CONFIG_CONTENT;
+    return this.spawnTuiPty(exe, spawnMsg, `Attaching TUI to ${base}`);
   }
 
   /** Embedded flow: TUI + private in-process server. */
