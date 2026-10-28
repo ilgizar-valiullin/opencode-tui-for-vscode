@@ -69,9 +69,10 @@ window.addEventListener("message", (e) => {
     fitAndReport();
   }
   if (e.data.type === "settingsData") {
-    const d = e.data as { opencodePath: string; serverPort: number; leaderChords: string[]; ctrlASelectAll: boolean; enterSendsMessage: boolean; orphanCleanupStartupScan: boolean; orphanCleanupWatchdog: boolean };
+    const d = e.data as { opencodePath: string; serverPort: number; serverMode: string; leaderChords: string[]; ctrlASelectAll: boolean; enterSendsMessage: boolean; orphanCleanupStartupScan: boolean; orphanCleanupWatchdog: boolean };
     (document.getElementById("setOpenCodePath") as HTMLInputElement).value = d.opencodePath;
     (document.getElementById("setServerPort") as HTMLInputElement).value = String(d.serverPort);
+    (document.getElementById("setServerMode") as HTMLSelectElement).value = d.serverMode === "separate" ? "separate" : "embedded";
     (document.getElementById("setLeaderChords") as HTMLInputElement).value = d.leaderChords.join(",");
     (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked = d.ctrlASelectAll;
     (document.getElementById("setEnterSendsMessage") as HTMLInputElement).checked = d.enterSendsMessage;
@@ -95,7 +96,9 @@ window.addEventListener("message", (e) => {
       toggleBtn.textContent = "Shutdown";
       if (startedOnce) {
         term.clear();
-        term.write(`\r\n\x1b[33m[TUI restarted (embedded server)]\x1b[0m\r\n`);
+        term.write(d.port > 0
+          ? `\r\n\x1b[33m[TUI restarted on ${d.address}:${d.port}]\x1b[0m\r\n`
+          : `\r\n\x1b[33m[TUI restarted (embedded server)]\x1b[0m\r\n`);
         term.focus();
       }
       startedOnce = true;
@@ -294,6 +297,7 @@ document.getElementById("settingsSaveBtn")!.addEventListener("click", () => {
     type: "saveSettings",
     opencodePath: (document.getElementById("setOpenCodePath") as HTMLInputElement).value,
     serverPort: parseInt((document.getElementById("setServerPort") as HTMLInputElement).value, 10) || 0,
+    serverMode: (document.getElementById("setServerMode") as HTMLSelectElement).value,
     leaderChords: chords.split(",").map((s) => s.trim()).filter(Boolean),
     ctrlASelectAll: (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked,
     enterSendsMessage: (document.getElementById("setEnterSendsMessage") as HTMLInputElement).checked,

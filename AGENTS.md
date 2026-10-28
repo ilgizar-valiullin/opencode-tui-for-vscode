@@ -2,7 +2,7 @@
 
 VS Code extension that embeds OpenCode TUI in a webview panel with proper keyboard handling for all layouts (Cyrillic, Korean, etc.).
 
-## Architecture (experiment: TUI + embedded server)
+## Architecture (unified: server-mode toggle, default embedded)
 
 ```
 VS Code Webview Panel
@@ -11,9 +11,11 @@ VS Code Webview Panel
 │   ├── Ctrl+key, leader chords, plain text → PTY stdin
 │   └── Paste (bracketed), resize, focus → host messages
 │
-Extension Host (Node.js) — ONE process per view, no separate `serve`
-├── OpenCodeServerManager — spawns `opencode --standalone` in node-pty
-│   (TUI hosts its own private server; readiness = PTY pid ack)
+Extension Host (Node.js) — mode from `opencode-tui-unofficial.serverMode`
+├── embedded (default): `opencode --standalone` in node-pty (one process
+│   per view, private in-process server, readiness = PTY pid ack)
+├── separate: headless `serve --port N` + TUI attached via `--server`
+│   (two processes per view, password-secured API, readiness = health poll)
 ├── IDE bridges (MCP/WS + diagnostics) env-forwarded into the TUI child
 └── Watchdog + startup orphan cleanup (name-based, unchanged)
 ```

@@ -11,6 +11,7 @@
   "config.title": "OpenCode TUI for VS Code",
   "cfg.opencodePath.desc": "Path to opencode. E.g. 'C:/Users/ilgiz/AppData/Local/OpenCode/opencode.exe', 'opencode.cmd', or just 'opencode'.",
   "cfg.serverPort.desc": "Port for opencode server. 0 = random available port.",
+  "cfg.serverMode.desc": "Server mode: 'embedded' (default) runs the TUI with its own private server; 'separate' runs a headless 'opencode serve' plus an attached TUI.",
   "cmd.toggleFocus.title": "Toggle OpenCode Focus",
   "cfg.leaderChords.desc": "Leader chord characters to intercept (e.g. [\"n\",\"m\",\"l\"]). Empty = use tui.json or built-in defaults.",
   "cfg.ctrlASelectAll.desc": "Redirect Ctrl+A to select-all in the input field instead of sending cursor-home to the terminal.",

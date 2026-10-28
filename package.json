@@ -124,6 +124,12 @@
           "default": 0,
           "description": "%cfg.serverPort.desc%"
         },
+        "opencode-tui-unofficial.serverMode": {
+          "type": "string",
+          "enum": ["embedded", "separate"],
+          "default": "embedded",
+          "description": "%cfg.serverMode.desc%"
+        },
         "opencode-tui-unofficial.leaderChords": {
           "type": "array",
           "items": {

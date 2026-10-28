@@ -1,3 +1,12 @@
+// ─── Server mode ───
+
+/**
+ * "embedded" (default): TUI runs `opencode --standalone` with its own
+ * private in-process server. "separate": legacy flow — headless
+ * `opencode serve --port N` plus a TUI attached via `--server`.
+ */
+export type ServerMode = "embedded" | "separate";
+
 // ─── OpenCode TUI command identifiers (from tui.json keybinds) ───
 
 export type TuiCommandId =
