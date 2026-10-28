@@ -87,28 +87,29 @@ window.addEventListener("message", (e) => {
     const restartBtn = document.getElementById("restartBtn") as HTMLButtonElement;
     const toggleBtn = document.getElementById("toggleBtn") as HTMLButtonElement;
     if (d.running) {
-      addrEl.textContent = `Server: ${d.address}:${d.port}`;
+      const label = d.port > 0 ? `${d.address}:${d.port}` : "embedded server";
+      addrEl.textContent = `TUI: ${label}`;
       restartBtn.disabled = false;
       restartBtn.textContent = "Restart";
       toggleBtn.disabled = false;
       toggleBtn.textContent = "Shutdown";
       if (startedOnce) {
         term.clear();
-        term.write(`\r\n\x1b[33m[Server restarted on ${d.address}:${d.port}]\x1b[0m\r\n`);
+        term.write(`\r\n\x1b[33m[TUI restarted (embedded server)]\x1b[0m\r\n`);
         term.focus();
       }
       startedOnce = true;
       // The PTY spawns at the 80x24 fallback before the panel is measured;
-      // report the real viewport once the server is up so the TUI repaints
+      // report the real viewport once the TUI is up so it repaints
       // fullscreen (also repairs resizes that happened while hidden).
       fitAndReport();
     } else {
-      addrEl.textContent = "Server: Stopped";
+      addrEl.textContent = "TUI: stopped";
       restartBtn.disabled = true;
       restartBtn.textContent = "Restart";
       toggleBtn.disabled = false;
       toggleBtn.textContent = "Start";
-      term.write(`\r\n\x1b[33m[Server stopped]\x1b[0m\r\n`);
+      term.write(`\r\n\x1b[33m[TUI stopped]\x1b[0m\r\n`);
     }
   }
 });

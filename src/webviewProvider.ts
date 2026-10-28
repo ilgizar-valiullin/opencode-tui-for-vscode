@@ -181,7 +181,7 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       server!.onStdout((data: string) => {
         webview.postMessage({ type: "terminalData", data });
       });
-      webview.postMessage({ type: "serverInfo", address: "localhost", port: server!.port, running: true });
+      webview.postMessage({ type: "serverInfo", address: "embedded", port: 0, running: true });
       return;
     }
 
@@ -198,17 +198,17 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
         server.onStdout((data: string) => {
           webview.postMessage({ type: "terminalData", data });
         });
-        webview.postMessage({ type: "serverInfo", address: "localhost", port: server.port, running: true });
+        webview.postMessage({ type: "serverInfo", address: "embedded", port: 0, running: true });
       } catch (err: any) {
         const m = err?.message ?? String(err);
-        webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
+        webview.postMessage({ type: "serverInfo", address: "embedded", port: 0, running: false });
         vscode.window.showErrorMessage(vscode.l10n.t("Failed to restart: {0}", m));
       }
     }
     if (msg.type === "toggleServer") {
       if (server.isRunning()) {
         await server.stop();
-        webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
+        webview.postMessage({ type: "serverInfo", address: "embedded", port: 0, running: false });
       } else {
         const config = vscode.workspace.getConfiguration("opencode-tui-unofficial");
         const openCodePath = config.get<string>("opencodePath", "opencode");
@@ -218,10 +218,10 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
           server.onStdout((data: string) => {
             webview.postMessage({ type: "terminalData", data });
           });
-          webview.postMessage({ type: "serverInfo", address: "localhost", port: server.port, running: true });
+          webview.postMessage({ type: "serverInfo", address: "embedded", port: 0, running: true });
         } catch (err: any) {
           const m = err?.message ?? String(err);
-          webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
+          webview.postMessage({ type: "serverInfo", address: "embedded", port: 0, running: false });
           vscode.window.showErrorMessage(vscode.l10n.t("Failed to start: {0}", m));
         }
       }

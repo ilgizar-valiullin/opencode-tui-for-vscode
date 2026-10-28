@@ -2,21 +2,20 @@
 
 VS Code extension that embeds OpenCode TUI in a webview panel with proper keyboard handling for all layouts (Cyrillic, Korean, etc.).
 
-## Architecture
+## Architecture (experiment: TUI + embedded server)
 
 ```
 VS Code Webview Panel
 ├── xterm.js (ANSI renderer — output only)
 ├── Keyboard Interceptor (event.code — works on any layout)
-│   ├── Ctrl+key → HTTP /tui/execute-command  (bypasses terminal bug)
-│   ├── Leader (Ctrl+X) → key sequence → HTTP
-│   └── Plain text → xterm.js → opencode stdin
+│   ├── Ctrl+key, leader chords, plain text → PTY stdin
+│   └── Paste (bracketed), resize, focus → host messages
 │
-Extension Host (Node.js)
-├── OpenCodeServerManager — spawns opencode, captures stdout
-├── OpenCodeClient — typed HTTP client for opencode REST API
-├── CommandDispatcher — routes DispatchedCommand → TUI or custom actions
-└── KeyboardHandler — matches event.code → TuiCommandId
+Extension Host (Node.js) — ONE process per view, no separate `serve`
+├── OpenCodeServerManager — spawns `opencode --standalone` in node-pty
+│   (TUI hosts its own private server; readiness = PTY pid ack)
+├── IDE bridges (MCP/WS + diagnostics) env-forwarded into the TUI child
+└── Watchdog + startup orphan cleanup (name-based, unchanged)
 ```
 
 ### Why this works
