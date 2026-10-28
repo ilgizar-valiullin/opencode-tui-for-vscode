@@ -2,7 +2,7 @@
   "name": "opencode-tui-for-vscode",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "publisher": "opencode-tui-unofficial",
   "license": "MIT",
   "repository": {
@@ -123,6 +123,22 @@
           "type": "integer",
           "default": 0,
           "description": "%cfg.serverPort.desc%"
+        },
+        "opencode-tui-unofficial.serverMode": {
+          "type": "string",
+          "enum": ["embedded", "separate", "external"],
+          "default": "embedded",
+          "description": "%cfg.serverMode.desc%"
+        },
+        "opencode-tui-unofficial.serverAddress": {
+          "type": "string",
+          "default": "",
+          "description": "%cfg.serverAddress.desc%"
+        },
+        "opencode-tui-unofficial.serverPassword": {
+          "type": "string",
+          "default": "",
+          "description": "%cfg.serverPassword.desc%"
         },
         "opencode-tui-unofficial.leaderChords": {
           "type": "array",

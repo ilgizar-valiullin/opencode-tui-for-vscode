@@ -4,12 +4,13 @@
  *
  * Protocol:
  *   Input (stdin, JSON-line):
- *     → {"type":"spawn","path":"opencode","port":1234}
- *         v1 TUI: args default to ["--port", port]
- *     → {"type":"spawn","path":"opencode","args":["--server","http://127.0.0.1:1234"]}
- *         v2 TUI: explicit argv (port optional); optional "password" sets
- *         OPENCODE_SERVER_PASSWORD for the child, "cwd"/"mcpPort"/"editorPort"
- *         as before ("editorPort" becomes OPENCODE_EDITOR_SSE_PORT)
+ *     → {"type":"spawn","path":"opencode","args":["--standalone"]}
+ *         TUI with embedded private server (no background service, no
+ *         separate `serve` process). Optional "cwd"/"mcpPort"/"editorPort"/
+ *         "bridgeUrl"/"bridgeToken"/"configContent" become env vars of the
+ *         TUI child ("mcpPort" → OPENCODE_MCP_PORT, "editorPort" →
+ *         OPENCODE_EDITOR_SSE_PORT, bridge pair → OPENCODE_VSCODE_BRIDGE_*,
+ *         configContent → OPENCODE_CONFIG_CONTENT).
  *     → {"type":"stdin","data":"text\n"}
  *     → {"type":"resize","cols":N,"rows":M}
  *     → {"type":"kill"}
@@ -49,13 +50,13 @@ rl.on("line", (line: string) => {
   let msg: { type: string; path?: string; port?: number; data?: string };
   try { msg = JSON.parse(line); } catch { return; }
 
-  if (msg.type === "spawn" && msg.path && (msg.port || (msg as any).args)) {
+  if (msg.type === "spawn" && msg.path && (msg as any).args) {
     const cwd = (msg as any).cwd || process.env.USERPROFILE || process.cwd();
     const rawArgs = (msg as any).args;
     const args: string[] =
       Array.isArray(rawArgs) && rawArgs.length > 0
         ? rawArgs.map(String)
-        : ["--port", String(msg.port)];
+        : ["--standalone"];
 
     const env = { ...process.env };
     delete env.WT_SESSION;
@@ -75,6 +76,18 @@ rl.on("line", (line: string) => {
 
     const childPassword = (msg as any).password;
     if (childPassword) env.OPENCODE_SERVER_PASSWORD = String(childPassword);
+
+    // VS Code diagnostics/IDE bridge: the embedded server lives inside the
+    // TUI process, so bridge env must be set on the TUI child (previously
+    // it was set on the separate `serve` process).
+    const bridgeUrl = (msg as any).bridgeUrl;
+    if (bridgeUrl) env.OPENCODE_VSCODE_BRIDGE_URL = String(bridgeUrl);
+
+    const bridgeToken = (msg as any).bridgeToken;
+    if (bridgeToken) env.OPENCODE_VSCODE_BRIDGE_TOKEN = String(bridgeToken);
+
+    const configContent = (msg as any).configContent;
+    if (configContent) env.OPENCODE_CONFIG_CONTENT = String(configContent);
 
     pty = spawn(msg.path, args, {
       name: "xterm-256color",

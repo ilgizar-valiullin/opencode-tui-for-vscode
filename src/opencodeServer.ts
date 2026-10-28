@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { createServer } from "net";
 import { existsSync, readFileSync } from "fs";
 import { OpenCodeClient } from "./httpClient";
+import type { ServerMode } from "./types";
 import * as path from "path";
 import * as os from "os";
 
@@ -16,6 +17,7 @@ export class OpenCodeServerManager {
   private serve_: ChildProcess | null = null;
   private port_: number = 0;
   private client_: OpenCodeClient | null = null;
+  private mode_: ServerMode = "embedded";
   private cwd_: string = "";
   private mcpPort_: number = 0;
   private editorPort_: number = 0;
@@ -23,6 +25,7 @@ export class OpenCodeServerManager {
   private bridgeToken_: string = "";
   private pluginDir_: string = "";
   private password_: string | null = null;
+  private address_: string = "";
   private stdoutCallback_: ((data: string) => void) | null = null;
   private stdoutBuffer_: string[] = [];
   private mcpDisconnectCallback_: (() => void) | null = null;
@@ -148,8 +151,51 @@ export class OpenCodeServerManager {
     this.pluginDir_ = pluginDir;
   }
 
+  /**
+   * "embedded" (default): single `opencode --standalone` with a private
+   * in-process server. "separate": headless `serve --port N` + TUI attached
+   * via `--server` (the pre-experiment flow). Applied on next start().
+   */
+  setServerMode(mode: ServerMode): void {
+    this.mode_ = mode === "separate" || mode === "external" ? mode : "embedded";
+  }
+
+  /** Address of an externally launched server (external mode), e.g. http://127.0.0.1:4096. */
+  setServerAddress(address: string): void {
+    this.address_ = (address ?? "").trim();
+  }
+
+  /** Password of the external server (OPENCODE_SERVER_PASSWORD), empty = none. */
+  setServerPassword(password: string): void {
+    this.password_ = (password ?? "").trim() || null;
+  }
+
   get client(): OpenCodeClient | null { return this.client_; }
-  get port(): number { return this.port_; }
+
+  /** Display host: parsed from the external address, "localhost" for separate, "embedded" otherwise. */
+  get host(): string {
+    if (this.mode_ === "external") {
+      try {
+        return new URL(this.address_).hostname || this.address_;
+      } catch {
+        return this.address_ || "external";
+      }
+    }
+    return this.mode_ === "separate" ? "localhost" : "embedded";
+  }
+
+  /** Display port: parsed from the external address, allocated port for separate, 0 for embedded. */
+  get port(): number {
+    if (this.mode_ === "external") {
+      try {
+        const p = new URL(this.address_).port;
+        return p ? parseInt(p, 10) : 0;
+      } catch {
+        return 0;
+      }
+    }
+    return this.port_;
+  }
   get cwd(): string { return this.cwd_; }
 
   onMcpClientDisconnect(cb: () => void): void {
@@ -175,17 +221,20 @@ export class OpenCodeServerManager {
   }
 
   /**
-   * v2-only flow: headless `serve --port N` (own child process,
-   * password-secured API) + TUI in the PTY attached via `--server <url>`.
-   * The same generated OPENCODE_SERVER_PASSWORD is shared by both processes
-   * and the API client. OpenCode v1 is no longer supported.
+   * Starts the TUI in the configured server mode (see setServerMode).
+   * Embedded (default): single `opencode --standalone` whose private server
+   * lives inside the TUI process — no allocated port, no password plumbing,
+   * readiness is the PTY spawn ack. Separate: headless `serve --port N`
+   * (password-secured API) + TUI attached via `--server <url>`; readiness is
+   * the serve health probe. External: no spawned server at all — the TUI
+   * attaches to a user-launched server (address + optional password from
+   * settings). OpenCode v1 is no longer supported.
    */
   async start(openCodePath: string, preferredPort?: number, cwd?: string): Promise<void> {
     if (this.helper_) return;
-    this.port_ = preferredPort && preferredPort > 0 ? preferredPort : await findFreePort();
     this.cwd_ = cwd ?? process.cwd();
-    // serve runs via plain child_process.spawn (no shell, no PTY), so it
-    // needs the direct .exe rather than a .cmd shim.
+    // node-pty spawns without a shell, so it needs the direct .exe
+    // rather than a .cmd shim.
     const exe = toDirectExecutable(resolveOcPath(openCodePath));
     const major = detectMajorVersion(exe);
     if (major !== 2) {
@@ -193,9 +242,67 @@ export class OpenCodeServerManager {
         `Unsupported opencode major version ${major}: this extension requires OpenCode v2.x.`
       );
     }
-    return this.startServe(exe);
+    if (this.mode_ === "external") {
+      return this.startExternal(exe);
+    }
+    if (this.mode_ === "separate") {
+      this.port_ = preferredPort && preferredPort > 0 ? preferredPort : await findFreePort();
+      return this.startServe(exe);
+    }
+    return this.startEmbedded(exe);
   }
 
+  /**
+   * External flow: attach the TUI to a server the user launched themselves
+   * (e.g. `opencode serve --port 4096`). Nothing is spawned except the TUI;
+   * auth goes through OPENCODE_SERVER_PASSWORD like in the separate flow.
+   */
+  private startExternal(exe: string): Promise<void> {
+    let address: URL;
+    try {
+      address = new URL(this.address_);
+    } catch {
+      throw new Error(
+        `External server mode needs opencode-tui-unofficial.serverAddress, e.g. http://127.0.0.1:4096 (got "${this.address_}").`
+      );
+    }
+    const base = address.toString().replace(/\/+$/, "");
+    log(`Attaching TUI to external server ${base}, oc=${exe}`);
+
+    const spawnMsg: Record<string, unknown> = {
+      type: "spawn",
+      path: exe,
+      args: ["--server", base],
+      cwd: this.cwd_,
+    };
+    if (this.password_) spawnMsg.password = this.password_;
+    if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
+    if (this.editorPort_) spawnMsg.editorPort = this.editorPort_;
+    if (this.bridgeUrl_) spawnMsg.bridgeUrl = this.bridgeUrl_;
+    if (this.bridgeToken_) spawnMsg.bridgeToken = this.bridgeToken_;
+    const extra = extraPluginEnv(process.env.OPENCODE_CONFIG_CONTENT, this.pluginDir_);
+    if (extra.OPENCODE_CONFIG_CONTENT) spawnMsg.configContent = extra.OPENCODE_CONFIG_CONTENT;
+    return this.spawnTuiPty(exe, spawnMsg, `Attaching TUI to ${base}`);
+  }
+
+  /** Embedded flow: TUI + private in-process server. */
+  private startEmbedded(exe: string): Promise<void> {
+    const spawnMsg: Record<string, unknown> = {
+      type: "spawn",
+      path: exe,
+      args: ["--standalone"],
+      cwd: this.cwd_,
+    };
+    if (this.mcpPort_) spawnMsg.mcpPort = this.mcpPort_;
+    if (this.editorPort_) spawnMsg.editorPort = this.editorPort_;
+    if (this.bridgeUrl_) spawnMsg.bridgeUrl = this.bridgeUrl_;
+    if (this.bridgeToken_) spawnMsg.bridgeToken = this.bridgeToken_;
+    const extra = extraPluginEnv(process.env.OPENCODE_CONFIG_CONTENT, this.pluginDir_);
+    if (extra.OPENCODE_CONFIG_CONTENT) spawnMsg.configContent = extra.OPENCODE_CONFIG_CONTENT;
+    return this.spawnTuiPty(exe, spawnMsg, "Starting TUI (embedded server)");
+  }
+
+  /** Separate flow: headless `serve --port N` + TUI attached via `--server`. */
   private async startServe(exe: string): Promise<void> {
     const password = randomBytes(24).toString("hex");
     this.password_ = password;
@@ -269,7 +376,8 @@ export class OpenCodeServerManager {
 
   /**
    * Spawn the TUI inside the node-pty helper. Resolves once the PTY reports
-   * the child pid (the serve API was already proven healthy before attaching
+   * the child pid (embedded mode: the server lives inside the TUI process;
+   * separate mode: the serve API was already proven healthy before attaching
    * the TUI).
    */
   private spawnTuiPty(
@@ -280,7 +388,7 @@ export class OpenCodeServerManager {
     const helperPath = path.resolve(__dirname, "ptyHelper.js");
     const nodeExe = findNode();
 
-    log(`${spawnLabel} on port ${this.port_}, oc=${ocPath}, exe=${nodeExe}`);
+    log(`${spawnLabel}, oc=${ocPath}, exe=${nodeExe}`);
 
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -288,8 +396,8 @@ export class OpenCodeServerManager {
         if (settled) return; settled = true;
         if (err) { logErr(`FAILED: ${err.message}`); reject(err); }
         else {
-          log(`Ready on port ${this.port_}`);
-          // Start watchdog after server is healthy
+          log(`Ready (pid ack)`);
+          // Start watchdog after the TUI is up
           if (OpenCodeServerManager.watchdogEnabled) {
             OpenCodeServerManager.startWatchdog();
           }

@@ -3,6 +3,13 @@ import * as fs from "fs";
 import * as path from "path";
 import { OpenCodeServerManager } from "./opencodeServer";
 import { savePastedBitmap } from "./commands/pasteMedia";
+import type { ServerMode } from "./types";
+
+/** Reads the server-mode toggle; anything but "separate"/"external" means embedded. */
+function readServerMode(): ServerMode {
+  const m = vscode.workspace.getConfiguration("opencode-tui-unofficial").get<string>("serverMode", "embedded");
+  return m === "separate" || m === "external" ? m : "embedded";
+}
 
 function extractLeaderChords(configDir: string, chords: Set<string>): void {
   const tuiPath = path.join(configDir, "tui.json");
@@ -95,7 +102,19 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
     if (this.mcpPort_) s.setMcpPort(this.mcpPort_);
     if (this.editorPort_) s.setEditorPort(this.editorPort_);
     if (this.bridgeUrl_ || this.pluginDir_) s.setIdeBridge(this.bridgeUrl_, this.bridgeToken_, this.pluginDir_);
+    const cfg = vscode.workspace.getConfiguration("opencode-tui-unofficial");
+    s.setServerMode(readServerMode());
+    s.setServerAddress(cfg.get<string>("serverAddress", ""));
+    s.setServerPassword(cfg.get<string>("serverPassword", ""));
     if (this.mcpDisconnectCallback_) s.onMcpClientDisconnect(this.mcpDisconnectCallback_);
+  }
+
+  /**
+   * Statusbar payload. Separate/external report host:port; embedded reports
+   * port 0 with the "embedded" marker (its server runs over stdio, no TCP).
+   */
+  private serverInfoMsg(host: string, port: number, running: boolean): Record<string, unknown> {
+    return { type: "serverInfo", address: host || "embedded", port, running };
   }
 
   getActiveServer(): OpenCodeServerManager | null {
@@ -181,7 +200,7 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       server!.onStdout((data: string) => {
         webview.postMessage({ type: "terminalData", data });
       });
-      webview.postMessage({ type: "serverInfo", address: "localhost", port: server!.port, running: true });
+      webview.postMessage(this.serverInfoMsg(server?.host ?? "embedded", server?.port ?? 0, true));
       return;
     }
 
@@ -193,35 +212,37 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       const openCodePath = config.get<string>("opencodePath", "opencode");
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       await server.stop();
+      this.configureServer(server);
       try {
         await server.start(openCodePath, undefined, workspaceFolder);
         server.onStdout((data: string) => {
           webview.postMessage({ type: "terminalData", data });
         });
-        webview.postMessage({ type: "serverInfo", address: "localhost", port: server.port, running: true });
+        webview.postMessage(this.serverInfoMsg(server?.host ?? "embedded", server?.port ?? 0, true));
       } catch (err: any) {
         const m = err?.message ?? String(err);
-        webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
+        webview.postMessage(this.serverInfoMsg("embedded", 0, false));
         vscode.window.showErrorMessage(vscode.l10n.t("Failed to restart: {0}", m));
       }
     }
     if (msg.type === "toggleServer") {
       if (server.isRunning()) {
         await server.stop();
-        webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
+        webview.postMessage(this.serverInfoMsg("embedded", 0, false));
       } else {
         const config = vscode.workspace.getConfiguration("opencode-tui-unofficial");
         const openCodePath = config.get<string>("opencodePath", "opencode");
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        this.configureServer(server);
         try {
           await server.start(openCodePath, undefined, workspaceFolder);
           server.onStdout((data: string) => {
             webview.postMessage({ type: "terminalData", data });
           });
-          webview.postMessage({ type: "serverInfo", address: "localhost", port: server.port, running: true });
+          webview.postMessage(this.serverInfoMsg(server?.host ?? "embedded", server?.port ?? 0, true));
         } catch (err: any) {
           const m = err?.message ?? String(err);
-          webview.postMessage({ type: "serverInfo", address: "localhost", port: 0, running: false });
+          webview.postMessage(this.serverInfoMsg("embedded", 0, false));
           vscode.window.showErrorMessage(vscode.l10n.t("Failed to start: {0}", m));
         }
       }
@@ -287,6 +308,9 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
         type: "settingsData",
         opencodePath: cfg.get<string>("opencodePath", "opencode"),
         serverPort: cfg.get<number>("serverPort", 0),
+        serverMode: readServerMode(),
+        serverAddress: cfg.get<string>("serverAddress", ""),
+        serverPassword: cfg.get<string>("serverPassword", ""),
         leaderChords: cfg.get<string[]>("leaderChords", []),
         ctrlASelectAll: cfg.get<boolean>("ctrlASelectAll", true),
         enterSendsMessage: cfg.get<boolean>("enterSendsMessage", true),
@@ -299,6 +323,9 @@ export class OpenCodeWebviewProvider implements vscode.WebviewViewProvider {
       const cfg = vscode.workspace.getConfiguration("opencode-tui-unofficial");
       await cfg.update("opencodePath", s.opencodePath, vscode.ConfigurationTarget.Global);
       await cfg.update("serverPort", s.serverPort as number, vscode.ConfigurationTarget.Global);
+      await cfg.update("serverMode", s.serverMode === "separate" || s.serverMode === "external" ? s.serverMode : "embedded", vscode.ConfigurationTarget.Global);
+      await cfg.update("serverAddress", s.serverAddress as string, vscode.ConfigurationTarget.Global);
+      await cfg.update("serverPassword", s.serverPassword as string, vscode.ConfigurationTarget.Global);
       await cfg.update("leaderChords", s.leaderChords as string[], vscode.ConfigurationTarget.Global);
       await cfg.update("ctrlASelectAll", s.ctrlASelectAll as boolean, vscode.ConfigurationTarget.Global);
       await cfg.update("enterSendsMessage", s.enterSendsMessage as boolean, vscode.ConfigurationTarget.Global);
@@ -372,9 +399,11 @@ html,body{height:100%;background:#0d1117;overflow:hidden}
 #settingsPanel .field{margin-bottom:16px}
 #settingsPanel .field label{display:block;margin-bottom:5px;color:#8b949e;font-size:12px;font-weight:400}
 #settingsPanel .field .desc{color:#484f58;font-size:11px;margin-top:5px;line-height:1.45}
-#settingsPanel .field input[type="text"],#settingsPanel .field input[type="number"]{width:100%;padding:7px 10px;background:#161b22;border:1px solid #30363d;color:#c9d1d9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box}
-#settingsPanel .field input[type="text"]:focus,#settingsPanel .field input[type="number"]:focus{border-color:#58a6ff;box-shadow:0 0 0 1px #58a6ff}
+#settingsPanel .field input[type="text"],#settingsPanel .field input[type="number"],#settingsPanel .field input[type="password"]{width:100%;padding:7px 10px;background:#161b22;border:1px solid #30363d;color:#c9d1d9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box}
+#settingsPanel .field input[type="text"]:focus,#settingsPanel .field input[type="number"]:focus,#settingsPanel .field input[type="password"]:focus{border-color:#58a6ff;box-shadow:0 0 0 1px #58a6ff}
 #settingsPanel .field input::placeholder{color:#484f58}
+#settingsPanel .field select{width:100%;padding:7px 10px;background:#161b22;border:1px solid #30363d;color:#c9d1d9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box}
+#settingsPanel .field select:focus{border-color:#58a6ff;box-shadow:0 0 0 1px #58a6ff}
 #settingsPanel .checkbox-field{padding-top:2px}
 #settingsPanel .checkbox-label{display:flex;align-items:center;gap:0;cursor:pointer;color:#c9d1d9;font-size:13px;user-select:none}
 #settingsPanel .checkbox-label input[type="checkbox"]{position:absolute;opacity:0;width:0;height:0}
@@ -399,6 +428,9 @@ html,body{height:100%;background:#0d1117;overflow:hidden}
 <div class="section-title">${vscode.l10n.t("Server")}</div>
 <div class="field"><label for="setOpenCodePath">${vscode.l10n.t("OpenCode Path")}</label><input type="text" id="setOpenCodePath" /><div class="desc">${vscode.l10n.t("Path to opencode executable, e.g. 'opencode' or full path to binary")}</div></div>
 <div class="field"><label for="setServerPort">${vscode.l10n.t("Server Port")}</label><input type="number" id="setServerPort" /><div class="desc">${vscode.l10n.t("Port for opencode REST API. 0 = auto (random free port on each start)")}</div></div>
+<div class="field"><label for="setServerMode">${vscode.l10n.t("Server Mode")}</label><select id="setServerMode"><option value="embedded">${vscode.l10n.t("Embedded (default)")}</option><option value="separate">${vscode.l10n.t("Separate process")}</option><option value="external">${vscode.l10n.t("External server")}</option></select><div class="desc">${vscode.l10n.t("Embedded: private in-process server (default). Separate: own headless server. External: connect to a server you launched yourself (extra memory).")}</div></div>
+<div class="field" id="serverAddressField"><label for="setServerAddress">${vscode.l10n.t("Server Address")}</label><input type="text" id="setServerAddress" placeholder="http://127.0.0.1:4096" /><div class="desc">${vscode.l10n.t("Address of an external 'opencode serve', e.g. http://127.0.0.1:4096. Stored in settings, reused across sessions.")}</div></div>
+<div class="field" id="serverPasswordField"><label for="setServerPassword">${vscode.l10n.t("Server Password")}</label><input type="password" id="setServerPassword" /><div class="desc">${vscode.l10n.t("Password of the external server (OPENCODE_SERVER_PASSWORD). Empty = no password.")}</div></div>
 </div>
 <div class="section">
 <div class="section-title">${vscode.l10n.t("Input")}</div>

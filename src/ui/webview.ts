@@ -69,9 +69,13 @@ window.addEventListener("message", (e) => {
     fitAndReport();
   }
   if (e.data.type === "settingsData") {
-    const d = e.data as { opencodePath: string; serverPort: number; leaderChords: string[]; ctrlASelectAll: boolean; enterSendsMessage: boolean; orphanCleanupStartupScan: boolean; orphanCleanupWatchdog: boolean };
+    const d = e.data as { opencodePath: string; serverPort: number; serverMode: string; serverAddress: string; serverPassword: string; leaderChords: string[]; ctrlASelectAll: boolean; enterSendsMessage: boolean; orphanCleanupStartupScan: boolean; orphanCleanupWatchdog: boolean };
     (document.getElementById("setOpenCodePath") as HTMLInputElement).value = d.opencodePath;
     (document.getElementById("setServerPort") as HTMLInputElement).value = String(d.serverPort);
+    (document.getElementById("setServerMode") as HTMLSelectElement).value = d.serverMode === "separate" || d.serverMode === "external" ? d.serverMode : "embedded";
+    (document.getElementById("setServerAddress") as HTMLInputElement).value = d.serverAddress;
+    (document.getElementById("setServerPassword") as HTMLInputElement).value = d.serverPassword;
+    updateServerModeFields();
     (document.getElementById("setLeaderChords") as HTMLInputElement).value = d.leaderChords.join(",");
     (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked = d.ctrlASelectAll;
     (document.getElementById("setEnterSendsMessage") as HTMLInputElement).checked = d.enterSendsMessage;
@@ -87,28 +91,33 @@ window.addEventListener("message", (e) => {
     const restartBtn = document.getElementById("restartBtn") as HTMLButtonElement;
     const toggleBtn = document.getElementById("toggleBtn") as HTMLButtonElement;
     if (d.running) {
-      addrEl.textContent = `Server: ${d.address}:${d.port}`;
+      const label = d.port > 0 ? `${d.address}:${d.port}` : (d.address && d.address !== "embedded" ? d.address : "embedded server");
+      addrEl.textContent = `TUI: ${label}`;
       restartBtn.disabled = false;
       restartBtn.textContent = "Restart";
       toggleBtn.disabled = false;
       toggleBtn.textContent = "Shutdown";
       if (startedOnce) {
         term.clear();
-        term.write(`\r\n\x1b[33m[Server restarted on ${d.address}:${d.port}]\x1b[0m\r\n`);
+        term.write(d.port > 0
+          ? `\r\n\x1b[33m[TUI restarted on ${d.address}:${d.port}]\x1b[0m\r\n`
+          : (d.address && d.address !== "embedded"
+            ? `\r\n\x1b[33m[TUI restarted on ${d.address}]\x1b[0m\r\n`
+            : `\r\n\x1b[33m[TUI restarted (embedded server)]\x1b[0m\r\n`));
         term.focus();
       }
       startedOnce = true;
       // The PTY spawns at the 80x24 fallback before the panel is measured;
-      // report the real viewport once the server is up so the TUI repaints
+      // report the real viewport once the TUI is up so it repaints
       // fullscreen (also repairs resizes that happened while hidden).
       fitAndReport();
     } else {
-      addrEl.textContent = "Server: Stopped";
+      addrEl.textContent = "TUI: stopped";
       restartBtn.disabled = true;
       restartBtn.textContent = "Restart";
       toggleBtn.disabled = false;
       toggleBtn.textContent = "Start";
-      term.write(`\r\n\x1b[33m[Server stopped]\x1b[0m\r\n`);
+      term.write(`\r\n\x1b[33m[TUI stopped]\x1b[0m\r\n`);
     }
   }
 });
@@ -192,6 +201,7 @@ el.addEventListener("focusin", () => vscode.postMessage({ type: "focusChange", f
 el.addEventListener("focusout", () => vscode.postMessage({ type: "focusChange", focused: false }));
 
 document.addEventListener("keydown", (e: KeyboardEvent) => {
+  if ((e.target as HTMLElement | null)?.closest?.("#settingsOverlay")) return;
   if ((e.ctrlKey || e.metaKey) && e.code === "KeyA" && __CTRL_A_SELECT_ALL__) {
     e.preventDefault();
     e.stopPropagation();
@@ -212,6 +222,9 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
 }, true);
 
 document.addEventListener("paste", (e: ClipboardEvent) => {
+  // Typing/pasting inside the settings panel belongs to the inputs —
+  // never forward it to the TUI.
+  if ((e.target as HTMLElement | null)?.closest?.("#settingsOverlay")) return;
   // Files/media first: pass them through to the TUI the way a native
   // terminal does. In Electron, files copied from the OS carry their real
   // path on the File object — paste it as-is. Pure clipboard bitmaps
@@ -273,6 +286,16 @@ document.addEventListener("paste", (e: ClipboardEvent) => {
   setTimeout(() => term.focus(), 0);
 }, true);
 
+document.getElementById("setServerMode")!.addEventListener("change", updateServerModeFields);
+
+function updateServerModeFields(): void {
+  // Address/password matter only for external mode — hide them otherwise
+  // so the Server section stays compact.
+  const show = (document.getElementById("setServerMode") as HTMLSelectElement).value === "external";
+  (document.getElementById("serverAddressField") as HTMLElement).style.display = show ? "" : "none";
+  (document.getElementById("serverPasswordField") as HTMLElement).style.display = show ? "" : "none";
+}
+
 document.getElementById("restartBtn")!.addEventListener("click", () => {
   vscode.postMessage({ type: "restartServer" });
 });
@@ -293,6 +316,9 @@ document.getElementById("settingsSaveBtn")!.addEventListener("click", () => {
     type: "saveSettings",
     opencodePath: (document.getElementById("setOpenCodePath") as HTMLInputElement).value,
     serverPort: parseInt((document.getElementById("setServerPort") as HTMLInputElement).value, 10) || 0,
+    serverMode: (document.getElementById("setServerMode") as HTMLSelectElement).value,
+    serverAddress: (document.getElementById("setServerAddress") as HTMLInputElement).value,
+    serverPassword: (document.getElementById("setServerPassword") as HTMLInputElement).value,
     leaderChords: chords.split(",").map((s) => s.trim()).filter(Boolean),
     ctrlASelectAll: (document.getElementById("setCtrlASelectAll") as HTMLInputElement).checked,
     enterSendsMessage: (document.getElementById("setEnterSendsMessage") as HTMLInputElement).checked,
